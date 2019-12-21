@@ -37,7 +37,7 @@ int io_write_time( FILE* fd )
 
     time_t timer = tv.tv_sec;
     struct tm* tblock = localtime( &timer );
-    int len = sprintf( tmpbuf, "%02d-%02d %02d:%02d:%02d:%03d  ", 
+    int len = sprintf( tmpbuf, "%02d-%02d %02d:%02d:%02d:%03d  ",
                 tblock->tm_mon + 1, tblock->tm_mday, tblock->tm_hour,
                 tblock->tm_min, tblock->tm_sec, (int)( tv.tv_usec ) / 1000 );
 
@@ -59,7 +59,7 @@ void io_rotate_log_file()
     time_t timer = tv.tv_sec;
     struct tm* tblock = localtime(&timer);
     sprintf(tmpbuf, "%s-%04d%02d%02d%02d%02d%02d", p_g_log_path, tblock->tm_year + 1900, tblock->tm_mon + 1, tblock->tm_mday, tblock->tm_hour, tblock->tm_min, tblock->tm_sec);
-    
+
     rename(p_g_log_path, tmpbuf);
 }
 
@@ -67,10 +67,10 @@ void io_dump_hex(const uint8_t *data, int32_t len)
 {
     int line      = 0;
     int max_lines = (len + 16) / 16;
-	
+
     for (line = 0; line < max_lines; line++) {
 	    char buf[100] = {0};
-        
+
         sprintf( buf, "%s%08x  ", buf, line * 16 );
 
         /* 打印 hex 字符 */
@@ -141,7 +141,7 @@ void io_dump_hex(const uint8_t *data, int32_t len)
                 sprintf( buf, "%s ", buf);
             }
         }
-        
+
         io_printf2("%s\n", buf);
     }
 }
@@ -173,7 +173,7 @@ void io_printf(const char* func, int line, const char* fmt, ...)
         if (len > LOG_BUF_MAX_SIZE)
             len = LOG_BUF_MAX_SIZE;
     } else {
-	    len += sprintf( tunnelBuf + len, "ret: %d, errno: %d", ret, errno ); 
+	    len += sprintf( tunnelBuf + len, "ret: %d, errno: %d", ret, errno );
     }
 
     tunnelBuf[len] = 0;

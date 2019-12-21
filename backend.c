@@ -26,25 +26,25 @@ struct accept_socket_table g_backend_accept_socket_table;
 
 #if 1
 
-struct free_node_buff_table g_backend_socket_buff_table;
+struct buff_table g_backend_socket_buff_table;
 
 void backend_socket_buff_table_init()
 {
-    free_node_buff_table_init(&g_backend_socket_buff_table, BACKEND_SOCKET_BUFF_MAX_NUM, sizeof(struct backend_sk_node), 1000, "g_backend_socket_buff_table");
+    buff_table_init(&g_backend_socket_buff_table, BACKEND_SOCKET_BUFF_MAX_NUM, sizeof(struct backend_sk_node), "g_backend_socket_buff_table");
 }
 
-struct backend_sk_node *malloc_backend_socket_node()
+inline struct backend_sk_node *malloc_backend_socket_node()
 {
-    struct backend_sk_node *p_node = (struct backend_sk_node *)free_node_buff_table_malloc_node(&g_backend_socket_buff_table);
+    struct backend_sk_node *p_node = (struct backend_sk_node *)buff_table_malloc_node(&g_backend_socket_buff_table);
     if (p_node)
         p_node->seq_id = unique_id_get();
     return p_node;
 }
 
-void free_backend_socket_node(struct backend_sk_node *p_node)
+inline void free_backend_socket_node(struct backend_sk_node *p_node)
 {
     unique_id_put(p_node->seq_id);
-    free_node_buff_table_free_node(&g_backend_socket_buff_table, &p_node->list_head);
+    buff_table_free_node(&g_backend_socket_buff_table, &p_node->list_head);
 }
 
 void display_g_backend_buff_table()
@@ -85,10 +85,14 @@ int backend_accept_init()
 
     return 0;
 }
-void backend_init()
+
+int backend_init()
 {
     backend_socket_buff_table_init();
 
+    backend_accept_init();
+
+    return 0;
 }
 
 void *backend_accept_process(void *arg)

@@ -13,28 +13,28 @@ enum{
 
 #define UNIQUE_ID_REUSE_SIZE    (60000)
 
-struct unique_id_info_t{
+struct unique_id_node {
     struct list_head    list_head;
 
     uint32_t            id;
 };
 
-struct unique_id_info_table{
+struct unique_id_table {
     struct list_head    inuse;
     struct list_head    unuse;
     uint32_t            inuse_num;
 
-    char                table_name[30];
     uint32_t            id;
 
     pthread_mutex_t     mutex;
 };
 
-void unique_id_info_init();
+int unique_id_init();
 uint32_t unique_id_get();
 void unique_id_put(uint32_t id);
+
 void display_g_unique_id_table();
-void display_g_unique_buff_table();
+void display_g_unique_id_buff_table();
 
 
 

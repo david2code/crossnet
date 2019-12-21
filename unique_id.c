@@ -16,21 +16,21 @@
 #include "main.h"
 
 #if 1
-struct free_node_buff_table g_unique_buf_table;
+struct buff_table g_unique_buf_table;
 
 void unique_buf_table_init()
 {
-    free_node_buff_table_init(&g_unique_buf_table, UNIQUE_ID_REUSE_SIZE, sizeof(struct unique_id_info_t), 10000, "g_unique_buf_table");
+    buff_table_init(&g_unique_buf_table, UNIQUE_ID_REUSE_SIZE, sizeof(struct unique_id_node), "g_unique_buf_table");
 }
 
-inline struct unique_id_info_t *malloc_unique_node()
+inline struct unique_id_node *malloc_unique_node()
 {
-    return (struct unique_id_info_t *)free_node_buff_table_malloc_node(&g_unique_buf_table);
+    return (struct unique_id_node *)buff_table_malloc_node(&g_unique_buf_table);
 }
 
-inline void free_unique_node(struct unique_id_info_t *p_node)
+inline void free_unique_node(struct unique_id_node *p_node)
 {
-    free_node_buff_table_free_node(&g_unique_buf_table, &p_node->list_head);
+    buff_table_free_node(&g_unique_buf_table, &p_node->list_head);
 }
 
 void display_g_unique_buff_table()
@@ -40,11 +40,11 @@ void display_g_unique_buff_table()
 
 #endif
 
-struct unique_id_info_table g_unique_id_info_table;
+struct unique_id_table g_unique_id_table;
 
-void unique_id_info_init()
+int unique_id_init()
 {
-    struct unique_id_info_table *p_table = &g_unique_id_info_table;
+    struct unique_id_table *p_table = &g_unique_id_table;
 
     unique_buf_table_init();
 
@@ -52,16 +52,17 @@ void unique_id_info_init()
     INIT_LIST_HEAD(&p_table->unuse);
     p_table->inuse_num = 0;
     pthread_mutex_init(&p_table->mutex, NULL);
-    strncpy(p_table->table_name, "g_unique_id_info_table", 30);
     p_table->id = UNIQUE_ID_SERVER_START;
 
-    DBG_PRINTF(DEBUG_WARNING, "init %s ok, size: %d\n", p_table->table_name, sizeof(struct unique_id_info_table));
+    DBG_PRINTF(DEBUG_WARNING, "done\n");
+
+    return 0;
 }
 
 uint32_t unique_id_get()
 {
-    struct unique_id_info_table *p_table = &g_unique_id_info_table;
-    struct unique_id_info_t *p_node = NULL;
+    struct unique_id_table *p_table = &g_unique_id_table;
+    struct unique_id_node *p_node = NULL;
     uint32_t        id = UNIQUE_ID_SERVER_END;
 
     pthread_mutex_lock(&p_table->mutex);
@@ -85,13 +86,13 @@ uint32_t unique_id_get()
 
         list_move(p_list, &p_table->inuse);
         p_table->inuse_num++;
-        p_node = list_entry(p_list, struct unique_id_info_t, list_head);
+        p_node = list_entry(p_list, struct unique_id_node, list_head);
         id = p_node->id;
     }
 #else
     if (p_table->id < UNIQUE_ID_SERVER_END)
     {
-        p_node       = (struct unique_id_info_t *)malloc(sizeof(struct unique_id_info_t));
+        p_node       = (struct unique_id_node *)malloc(sizeof(struct unique_id_node));
         if (p_node != NULL)
         {
             id   = p_table->id++;
@@ -103,7 +104,7 @@ uint32_t unique_id_get()
         struct list_head *p_list = p_table->unuse.next;
 
         list_move(p_list, &p_table->inuse);
-        p_node = list_entry(p_list, struct unique_id_info_t, list_head);
+        p_node = list_entry(p_list, struct unique_id_node, list_head);
         id = p_node->id;
     }
 #endif
@@ -114,8 +115,8 @@ uint32_t unique_id_get()
 
 void unique_id_put(uint32_t id)
 {
-    struct unique_id_info_table *p_table = &g_unique_id_info_table;
-    struct unique_id_info_t *p_node = NULL;
+    struct unique_id_table *p_table = &g_unique_id_table;
+    struct unique_id_node *p_node = NULL;
     pthread_mutex_lock(&p_table->mutex);
 
     if (list_empty(&p_table->inuse)) {
@@ -125,7 +126,7 @@ void unique_id_put(uint32_t id)
 
         list_move_tail(p_list, &p_table->unuse);
         p_table->inuse_num--;
-        p_node = list_entry(p_list, struct unique_id_info_t, list_head);
+        p_node = list_entry(p_list, struct unique_id_node, list_head);
         p_node->id = id;
 
     }
@@ -135,7 +136,7 @@ void unique_id_put(uint32_t id)
 
 void display_g_unique_id_table()
 {
-    struct unique_id_info_table *p_table = &g_unique_id_info_table;
+    struct unique_id_table *p_table = &g_unique_id_table;
     DBG_RAW_PRINTF("\n\nid: %d, inuse_num: %u\n\n",
         p_table->id,
         p_table->inuse_num);

@@ -17,6 +17,7 @@
 #include "main.h"
 #include "log.h"
 #include "backend.h"
+#include "unique_id.h"
 
 int g_main_running = 1;
 int g_main_debug = DEBUG_NORMAL;
@@ -83,6 +84,51 @@ int main_daemon()
     return 0;
 }
 
+void sigfun(int sig)
+{
+    DBG_PRINTF(DEBUG_CLOSE, "signal %d\n", sig );
+    g_main_running = 0;
+}
+
+/* Signale wrapper. */
+void signal_set (int signo, void (*func)(int))
+{
+    struct sigaction sig;
+    struct sigaction osig;
+
+    sig.sa_handler = func;
+    sig.sa_flags = 0;
+#ifdef SA_RESTART
+    sig.sa_flags |= SA_RESTART;
+#endif /* SA_RESTART */
+
+    if ((-1 == sigemptyset (&sig.sa_mask))
+        || (-1 == sigaction (signo, &sig, &osig))) {
+        DBG_PRINTF(DEBUG_CLOSE, "signal %d, error\n", signo);
+        perror("failed to set signal\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void signal_init ()
+{
+    //signal_set (SIGINT, sigfun);
+    signal_set (SIGTSTP, sigfun);
+    //signal_set (SIGKILL, sigfun);
+    //signal_set (SIGTERM, sigfun);
+    signal_set (SIGSEGV, sigfun);
+}
+
+int init()
+{
+    signal_init();
+
+    unique_id_init();    
+    
+    backend_init();
+
+    return 0;
+}
 int main(int argc, char **argv)
 {
     bool daemon = false;
@@ -133,7 +179,7 @@ int main(int argc, char **argv)
 
     //display_g_main_config();
 
-    //main_init();
+    init();
 
 #if 0
     setvbuf(stdout,NULL,_IONBF,0);
