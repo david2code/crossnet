@@ -23,7 +23,7 @@ extern int h_errno;
 #include <sys/ioctl.h>
 #include <iconv.h>
 
-#include "misc_func.h"
+#include "misc.h"
 
 /*
 
@@ -956,20 +956,6 @@ inline uint32_t ngx_hash(ngx_str_t *key)
             sum += ((uint16_t)key->data[i]) << 8;
     }
     return sum;
-}
-
-uint16_t lt_make_send_cmd(uint8_t *p_buf, uint16_t type, int seq_id)
-{
-    uint16_t    hdr_len = sizeof(struct ip_proxy_hdr);
-    
-    struct ip_proxy_hdr *p_hdr = (struct ip_proxy_hdr *)p_buf;
-    p_hdr->magic = htonl(IP_PROXY_MAGIC_NUMBER);
-    p_hdr->type = htons(type);
-    p_hdr->seq_id = htonl(seq_id);
-    
-    p_hdr->hdr_len      = htons(hdr_len);
-    p_hdr->total_len    = htons(hdr_len);
-    return hdr_len;
 }
 
 char *ngx_print(char *buf, int len, ngx_str_t *p_ngx_str)

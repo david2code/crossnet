@@ -17,7 +17,7 @@
 #include "main.h"
 #include "log.h"
 #include "backend.h"
-#include "buff_list.h"
+#include "buff.h"
 #include "unique_id.h"
 #include "misc.h"
 
@@ -81,7 +81,9 @@ int backend_accept_init()
     p_table->fd              = server_socket_fd;
 
     set_none_block(p_table->fd);
-    add_event(p_table->epfd, p_table->fd, p_node, EPOLLIN);
+    add_event(p_table->epfd, p_table->fd, NULL, EPOLLIN);
+
+    return 0;
 }
 void backend_init()
 {

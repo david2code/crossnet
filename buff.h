@@ -1,11 +1,12 @@
-#ifndef _BUFF_LIST_H
-#define _BUFF_LIST_H
+#ifndef _BUFF_H
+#define _BUFF_H
 
 #include <stdint.h>
 
 #include "kernel_list.h"
 
 #define FREE_NODE_BUFF_TABLE_NAME_LEN   100    
+
 struct free_node_buff_table{
     struct list_head    list_head;
     uint32_t            num;

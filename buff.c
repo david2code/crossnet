@@ -1,16 +1,19 @@
 #include <stdio.h>  
 #include <stdlib.h>
 #include <string.h>
-#include "buff_list.h"
-#include "misc_func.h"
+#include <pthread.h>
+
+#include "buff.h"
+#include "misc.h"
 #include "log.h"
+#include "main.h"
 
 int free_node_buff_table_init(struct free_node_buff_table *p_table, uint32_t limit_size, uint32_t node_size, uint32_t malloc_count, const char* name)
 {
     INIT_LIST_HEAD(&p_table->list_head);
     p_table->num = 0;
     pthread_mutex_init(&p_table->mutex, NULL);
-    strncpy(p_table->table_name, name, free_node_buff_table_NAME_LEN);
+    strncpy(p_table->table_name, name, FREE_NODE_BUFF_TABLE_NAME_LEN);
     p_table->limit_size    = limit_size;
     p_table->node_size     = node_size;
     p_table->malloc_count  = malloc_count;
@@ -59,7 +62,7 @@ struct list_head *free_node_buff_table_malloc_node(struct free_node_buff_table *
     pthread_mutex_lock(&p_table->mutex);
 
     if (list_empty(&p_table->list_head)) {
-        p_node = lt_free_node_buff_table_malloc_entry(p_table);
+        p_node = free_node_buff_table_malloc_entry(p_table);
     } else {
         p_node = p_table->list_head.next;
         

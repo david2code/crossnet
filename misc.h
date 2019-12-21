@@ -1,5 +1,5 @@
-#ifndef __FUNCTION_H__
-#define __FUNCTION_H__
+#ifndef _MISC_H
+#define _MISC_H
 
 #include <stdbool.h>
 #include <ctype.h>
@@ -199,7 +199,6 @@ inline int uint64_t_cmp(uint64_t *a, uint64_t *b);
 inline int ngx_cmp(ngx_str_t *a, ngx_str_t *b);
 inline uint32_t ngx_hash(ngx_str_t *key);
 
-uint16_t lt_make_send_cmd(uint8_t *p_buf, uint16_t type, int seq_id);
 char *ngx_print(char *buf, int len, ngx_str_t *p_ngx_str);
 int ngx_split(ngx_str_t *orig, char sepch, ngx_str_t *part_a, ngx_str_t *part_b);
 int event_notify(int event_fd);

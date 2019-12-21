@@ -10,8 +10,8 @@
 #include <pthread.h>
 
 #include "log.h"
-#include "misc_func.h"
-#include "buff_list.h"
+#include "misc.h"
+#include "buff.h"
 #include "unique_id.h"
 #include "main.h"
 
@@ -23,14 +23,14 @@ void unique_buf_table_init()
     free_node_buff_table_init(&g_unique_buf_table, UNIQUE_ID_REUSE_SIZE, sizeof(struct unique_id_info_t), 10000, "g_unique_buf_table");
 }
 
-struct unique_id_info_t *malloc_unique_node()
+inline struct unique_id_info_t *malloc_unique_node()
 {
-    return (struct unique_id_info_t *)lt_free_node_buff_table_malloc_node(&g_unique_buf_table);
+    return (struct unique_id_info_t *)free_node_buff_table_malloc_node(&g_unique_buf_table);
 }
 
-void free_unique_node(struct unique_id_info_t *p_node)
+inline void free_unique_node(struct unique_id_info_t *p_node)
 {
-    lt_free_node_buff_table_free_node(&g_unique_buf_table, &p_node->list_head);
+    free_node_buff_table_free_node(&g_unique_buf_table, &p_node->list_head);
 }
 
 void display_g_unique_buff_table()
