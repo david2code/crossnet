@@ -2,9 +2,17 @@
 #define _BACKEND_H
 
 #include "kernel_list.h"
-#define BACKEND_SOCKET_BUFF_MAX_NUM         5000
-#define BACKEND_EPOLL_ACCEPT_MAX_EVENTS     5000
-#define BACKEND_SOCKET_LISTEN_BACKLOG       500
+#include "hash_table.h"
+#include "notify.h"
+
+#define BACKEND_SOCKET_MAX_NUM         5000
+#define BACKEND_THREAD_HASH_SIZE       (BACKEND_SOCKET_MAX_NUM / BACKEND_WORK_THREAD_NUM)
+
+#define BACKEND_ACCEPT_EPOLL_MAX_EVENTS     5000
+#define BACKEND_ACCEPT_LISTEN_BACKLOG       500
+
+#define BACKEND_THREAD_EPOLL_MAX_EVENTS  (BACKEND_ACCEPT_EPOLL_MAX_EVENTS / BACKEND_WORK_THREAD_NUM)
+#define BACKEND_THREAD_LISTEN_BACKLOG  (BACKEND_ACCEPT_LISTEN_BACKLOG / BACKEND_WORK_THREAD_NUM)
 
 struct backend_sk_node {
     struct list_head    list_head;
@@ -47,6 +55,28 @@ struct backend_sk_node {
 struct accept_socket_table {
     int                     fd;
     int                     event_fd;
+    int                     epfd;
+    struct epoll_event      *events;
+};
+
+enum {
+    BACKEND_SOCKET_TYPE_READY,
+    BACKEND_SOCKET_TYPE_DEL,
+    BACKEND_SOCKET_TYPE_MAX
+};
+
+struct backend_work_thread_table {
+    int                     index;
+    pthread_t               thread_id;
+    char                    table_name[TABLE_NAME_LEN + 1];
+    pthread_mutex_t         mutex;    
+    
+    struct list_table       list_head[BACKEND_SOCKET_TYPE_MAX];
+    
+    struct hash_table       hash;
+    struct notify_table     notify;
+    
+    int                     event_fd;    
     int                     epfd;
     struct epoll_event      *events;
 };

@@ -2,6 +2,7 @@
 #define _MISC_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <ctype.h>
 
 typedef struct {
