@@ -16,6 +16,13 @@ static int  g_file_size        = 0;
 static char g_log_path[200]    = {0};
 static char *p_g_log_path      = NULL;
 
+const char *g_dbg_level_str[DBG_MAX] = {
+    "close",
+    "error",
+    "warning",
+    "normal"
+};
+
 void log_init(char *log_path)
 {
     g_file_size = 0;
@@ -63,7 +70,7 @@ void io_rotate_log_file()
     rename(p_g_log_path, tmpbuf);
 }
 
-void io_dump_hex(const uint8_t *data, int32_t len)
+void log_dump_hex(const uint8_t *data, int32_t len)
 {
     int line      = 0;
     int max_lines = (len + 16) / 16;
@@ -150,7 +157,7 @@ void io_dump_hex(const uint8_t *data, int32_t len)
  * 文件不要频繁打开关闭
  *
  * */
-void io_printf(const char* func, int line, const char* fmt, ...)
+void io_printf(const char *dbg_str, const char *func, int line, const char* fmt, ...)
 {
     if (!p_g_log_path)
         return;
@@ -162,7 +169,7 @@ void io_printf(const char* func, int line, const char* fmt, ...)
     int         ret             = 0;
 	const char  *log_path       = p_g_log_path;
 
-	len = snprintf(tunnelBuf, LOG_BUF_MAX_SIZE, "[%s %d] ", func, line);
+	len = snprintf(tunnelBuf, LOG_BUF_MAX_SIZE, "[%s %s %d] ", dbg_str, func, line);
 
 	va_start(varg, fmt);
 	ret = vsnprintf(tunnelBuf + len, LOG_BUF_MAX_SIZE - len, fmt, varg);

@@ -14,7 +14,7 @@ struct notify_table {
     pthread_mutex_t     mutex;
 };
 
-enum pipe_notify_type{
+enum pipe_notify_type {
     PIPE_NOTIFY_TYPE_SOCKET_NODE,
     PIPE_NOTIFY_TYPE_PAIRS_INFO,
     PIPE_NOTIFY_TYPE_SELF_SEND,/* socket通知自己将数据发送出去*/
@@ -23,7 +23,7 @@ enum pipe_notify_type{
     PIPE_NOTIFY_TYPE_MAX
 };
 
-struct socket_notify_block{
+struct notify_node {
     struct list_head        list_head;
     
     enum pipe_notify_type   type;
@@ -36,7 +36,7 @@ struct socket_notify_block{
     uint8_t                 buf[MAX_BUFF_SIZE];    
 };
 
-enum socket_nofity_type{
+enum socket_nofity_type {
     SOCKET_NOTIFY_TYPE_FREE,
     SOCKET_NOTIFY_TYPE_FRONT,
     SOCKET_NOTIFY_TYPE_MANAGE,
@@ -50,10 +50,11 @@ int lt_nofity_make_cmd_to_front(uint32_t src_id, uint32_t dest_id, enum pipe_not
 void display_g_notify_buff_table();
 
 void notify_buf_table_init();
-struct socket_notify_block *malloc_notify_node();
-void free_notify_node(struct socket_notify_block *p_node);
-int my_notify_table_init(struct notify_table *p_block, char *name, uint32_t limit_size);
-struct socket_notify_block *my_notify_table_get(struct notify_table *p_block);
-int my_notify_table_put_head(struct notify_table *p_block, struct socket_notify_block *p_node);
-int my_notify_table_put_tail(struct notify_table *p_block, struct socket_notify_block *p_node);
+struct notify_node *malloc_notify_node();
+void free_notify_node(struct notify_node *p_node);
+
+int notify_table_init(struct notify_table *p_table, char *name, uint32_t limit_size);
+struct notify_node *notify_table_get(struct notify_table *p_table);
+int notify_table_put_head(struct notify_table *p_table, struct notify_node *p_node);
+int notify_table_put_tail(struct notify_table *p_table, struct notify_node *p_node);
 #endif

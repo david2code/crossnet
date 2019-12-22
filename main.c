@@ -20,19 +20,19 @@
 #include "unique_id.h"
 
 int g_main_running = 1;
-int g_main_debug = DEBUG_NORMAL;
+int g_main_debug = DBG_NORMAL;
 
 void *timer_process(void *arg)
 {
     prctl(PR_SET_NAME, __FUNCTION__);
 
-    DBG_PRINTF(DEBUG_WARNING, "enter timerstamp %d\n", time(NULL));
+    DBG_PRINTF(DBG_WARNING, "enter timerstamp %d\n", time(NULL));
 
     while(g_main_running) {
         sleep(20);
     }
 
-    DBG_PRINTF(DEBUG_WARNING, "leave timestamp %d\n", time(NULL));
+    DBG_PRINTF(DBG_WARNING, "leave timestamp %d\n", time(NULL));
 
     exit(EXIT_SUCCESS);
 }
@@ -41,7 +41,7 @@ int main_daemon()
 {
     switch (fork()) {
     case -1:
-        DBG_PRINTF(DEBUG_ERROR, "fork() failed");
+        DBG_PRINTF(DBG_ERROR, "fork() failed");
         return -1;
 
     case 0:
@@ -52,7 +52,7 @@ int main_daemon()
     }
 
     if (setsid() == -1) {
-        DBG_PRINTF(DEBUG_ERROR, "setsid() failed");
+        DBG_PRINTF(DBG_ERROR, "setsid() failed");
         return -1;
     }
 
@@ -60,23 +60,23 @@ int main_daemon()
 
     int fd = open("/dev/null", O_RDWR);
     if (fd == -1) {
-        DBG_PRINTF(DEBUG_ERROR, "open(\"/dev/null\") failed");
+        DBG_PRINTF(DBG_ERROR, "open(\"/dev/null\") failed");
         return -1;
     }
 
     if (dup2(fd, STDIN_FILENO) == -1) {
-        DBG_PRINTF(DEBUG_ERROR, "dup2(STDIN) failed");
+        DBG_PRINTF(DBG_ERROR, "dup2(STDIN) failed");
         return -1;
     }
 
     if (dup2(fd, STDOUT_FILENO) == -1) {
-        DBG_PRINTF(DEBUG_ERROR, "dup2(STDOUT) failed");
+        DBG_PRINTF(DBG_ERROR, "dup2(STDOUT) failed");
         return -1;
     }
 
     if (fd > STDERR_FILENO) {
         if (close(fd) == -1) {
-            DBG_PRINTF(DEBUG_ERROR, "close() failed");
+            DBG_PRINTF(DBG_ERROR, "close() failed");
             return -1;
         }
     }
@@ -84,14 +84,8 @@ int main_daemon()
     return 0;
 }
 
-void sigfun(int sig)
-{
-    DBG_PRINTF(DEBUG_CLOSE, "signal %d\n", sig );
-    g_main_running = 0;
-}
-
 /* Signale wrapper. */
-void signal_set (int signo, void (*func)(int))
+void signal_set(int signo, void (*func)(int))
 {
     struct sigaction sig;
     struct sigaction osig;
@@ -103,11 +97,18 @@ void signal_set (int signo, void (*func)(int))
 #endif /* SA_RESTART */
 
     if ((-1 == sigemptyset (&sig.sa_mask))
-        || (-1 == sigaction (signo, &sig, &osig))) {
-        DBG_PRINTF(DEBUG_CLOSE, "signal %d, error\n", signo);
+            || (-1 == sigaction (signo, &sig, &osig))) {
+        DBG_PRINTF(DBG_CLOSE, "signal %d, error\n", signo);
         perror("failed to set signal\n");
         exit(EXIT_FAILURE);
     }
+}
+
+void sigfun(int sig)
+{
+    DBG_PRINTF(DBG_CLOSE, "signal %d\n", sig);
+    signal_set(sig, SIG_DFL);
+    g_main_running = 0;
 }
 
 void signal_init ()
@@ -123,8 +124,9 @@ int init()
 {
     signal_init();
 
-    unique_id_init();    
-    
+    unique_id_init();
+    notify_buf_table_init();
+
     backend_init();
 
     return 0;
@@ -223,5 +225,4 @@ int main(int argc, char **argv)
     }
 
     return 0;
-
 }

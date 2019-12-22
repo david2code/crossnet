@@ -19,7 +19,7 @@ struct backend_sk_node {
     struct list_head    mac_hash_node;
     struct list_head    id_hash_node;
 
-    int                 fd;  /* 当前socket的描述符 */
+    int                 fd;
     uint32_t            seq_id;/* 每一个socket都会分配一个seq_id通过这个seq_id找到相应的socket */
 
     uint32_t            ip;  /*如果accept得到，则为对方的ip，否则是当前监听的ip。下面的port类似*/
@@ -30,7 +30,7 @@ struct backend_sk_node {
 
     void                *p_my_table;
 
-    struct socket_notify_block *p_recv_node;/*存储接收数据*/
+    struct notify_node  *p_recv_node;/*存储接收数据*/
     struct list_head    send_list;/*存储发送数据节点*/
 
     time_t              last_active;
@@ -46,7 +46,6 @@ struct backend_sk_node {
     uint32_t            delay_ms;
 
     void                (*read_cb)(void *v);
-    void                (*deal_read_data_cb)(void *v);
     void                (*write_cb)(void *v);
     void                (*exit_cb)(void *v);/* 此回调函数将当前socket从epoll监听中删除 */
     void                (*del_cb)(void *v);
@@ -80,6 +79,15 @@ struct backend_work_thread_table {
     int                     epfd;
     struct epoll_event      *events;
 };
+
+#define BACKEND_MAGIC           0x5a5a
+#define MAX_IP_PROXY_HDR_SIZE   300
+
+struct backend_hdr {
+    uint16_t  magic;
+    uint8_t   type;
+    uint16_t  total_len;
+}__attribute__((packed));
 
 int backend_init();
 void *backend_accept_process(void *arg);

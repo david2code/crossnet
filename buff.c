@@ -19,7 +19,7 @@ int buff_table_init(struct buff_table *p_table, uint32_t limit_size, uint32_t no
     p_table->malloc_count  = (limit_size + BUFF_MALLOC_MAX_TIMES - 1) / BUFF_MALLOC_MAX_TIMES;
     p_table->total_count   = 0;
 
-    DBG_PRINTF(DEBUG_WARNING, "init buff_table: %-30s, limit_size: %8d, node_size: %6d, malloc_count: %3d\n",
+    DBG_PRINTF(DBG_WARNING, "init buff_table: %-30s, limit_size: %8d, node_size: %6d, malloc_count: %3d\n",
             p_table->table_name,
             p_table->limit_size,
             p_table->node_size,
@@ -31,7 +31,7 @@ int buff_table_init(struct buff_table *p_table, uint32_t limit_size, uint32_t no
 struct list_head *buff_table_malloc_entry(struct buff_table *p_table)
 {
     if (p_table->total_count >= p_table->limit_size) {
-        DBG_PRINTF(DEBUG_WARNING, "%s full, total_count: %u, limit_size: %u!\n",
+        DBG_PRINTF(DBG_WARNING, "%s full, total_count: %u, limit_size: %u!\n",
             p_table->table_name,
             p_table->total_count,
             p_table->limit_size);
@@ -95,7 +95,7 @@ void display_buff_table(struct buff_table *p_buff_table)
     DBG_RAW_PRINTF("\n");
     pthread_mutex_lock(&p_buff_table->mutex);
 
-    DBG_PRINTF(DEBUG_WARNING, "table_name: %s, limit_size: %u, node_size: %u, malloc_count: %u, total_count: %u, avaiable num: %u\n",
+    DBG_PRINTF(DBG_WARNING, "table_name: %s, limit_size: %u, node_size: %u, malloc_count: %u, total_count: %u, avaiable num: %u\n",
         p_buff_table->table_name,
         p_buff_table->limit_size,
         p_buff_table->node_size,

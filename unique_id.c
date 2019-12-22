@@ -54,7 +54,7 @@ int unique_id_init()
     pthread_mutex_init(&p_table->mutex, NULL);
     p_table->id = UNIQUE_ID_SERVER_START;
 
-    DBG_PRINTF(DEBUG_WARNING, "done\n");
+    DBG_PRINTF(DBG_WARNING, "done\n");
 
     return 0;
 }
@@ -120,7 +120,7 @@ void unique_id_put(uint32_t id)
     pthread_mutex_lock(&p_table->mutex);
 
     if (list_empty(&p_table->inuse)) {
-        DBG_PRINTF(DEBUG_WARNING, "critical error happen, %u!\n", p_table->id);
+        DBG_PRINTF(DBG_WARNING, "critical error happen, %u!\n", p_table->id);
     } else {
         struct list_head *p_list = p_table->inuse.next;
 
