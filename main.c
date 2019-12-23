@@ -16,6 +16,7 @@
 
 #include "main.h"
 #include "log.h"
+#include "frontend.h"
 #include "backend.h"
 #include "unique_id.h"
 
@@ -127,6 +128,7 @@ int init()
     unique_id_init();
     notify_buf_table_init();
 
+    frontend_init();
     backend_init();
 
     return 0;
@@ -188,7 +190,7 @@ int main(int argc, char **argv)
 #endif
 
     int res;
-    //pthread_t frontend_thread;
+    pthread_t frontend_thread;
     pthread_t backend_thread;
     pthread_t timer_thread;
 
@@ -200,6 +202,12 @@ int main(int argc, char **argv)
         printf("block sigpipe error\n");
     }
 
+    res = pthread_create(&frontend_thread, NULL, frontend_accept_process, NULL);
+    if (res != 0) {
+        perror("Thread creation failed!");
+        exit(EXIT_FAILURE);
+    }
+
     res = pthread_create(&backend_thread, NULL, backend_accept_process, NULL);
     if (res != 0) {
         perror("Thread creation failed!");
@@ -209,6 +217,12 @@ int main(int argc, char **argv)
     res = pthread_create(&timer_thread, NULL, timer_process, NULL);
     if (res != 0) {
         perror("Thread creation failed!");
+        exit(EXIT_FAILURE);
+    }
+
+    res = pthread_join(frontend_thread, NULL);
+    if (res != 0) {
+        perror("Thread join failed!");
         exit(EXIT_FAILURE);
     }
 

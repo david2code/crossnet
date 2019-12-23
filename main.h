@@ -6,6 +6,10 @@
 
 #define USER_NUM      100
 
+#define FRONTEND_PORT   80
+//#define FRONTEND_PORT   443
+#define FRONTEND_WORK_THREAD_NUM    4
+
 #define BACKEND_PORT   66
 #define BACKEND_WORK_THREAD_NUM    4
 
@@ -25,6 +29,13 @@ struct list_table {
     uint32_t            num;
 };
 
+
+struct accept_socket_table {
+    int                     fd;
+    int                     event_fd;
+    int                     epfd;
+    struct epoll_event      *events;
+};
 
 extern int g_main_running;
 #endif

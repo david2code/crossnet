@@ -20,9 +20,9 @@ struct backend_sk_node {
     struct list_head    id_hash_node;
 
     int                 fd;
-    uint32_t            seq_id;/* 每一个socket都会分配一个seq_id通过这个seq_id找到相应的socket */
+    uint32_t            seq_id;
 
-    uint32_t            ip;  /*如果accept得到，则为对方的ip，否则是当前监听的ip。下面的port类似*/
+    uint32_t            ip;
     uint16_t            port;
 
     uint32_t            user_block_id;
@@ -30,15 +30,14 @@ struct backend_sk_node {
 
     void                *p_my_table;
 
-    struct notify_node  *p_recv_node;/*存储接收数据*/
-    struct list_head    send_list;/*存储发送数据节点*/
+    struct notify_node  *p_recv_node;
+    struct list_head    send_list;
 
     time_t              last_active;
 
-    uint8_t             status;         /* 当前状态 */
-    //enum manage_table_type table_type;
+    uint8_t             status;
 
-    uint8_t             type;           /* 当前socket的类型，从而确定其所在的list */
+    uint8_t             type;
     uint8_t             blocked;
 
     uint32_t            alive_cnt;
@@ -47,15 +46,8 @@ struct backend_sk_node {
 
     void                (*read_cb)(void *v);
     void                (*write_cb)(void *v);
-    void                (*exit_cb)(void *v);/* 此回调函数将当前socket从epoll监听中删除 */
+    void                (*exit_cb)(void *v);
     void                (*del_cb)(void *v);
-};
-
-struct accept_socket_table {
-    int                     fd;
-    int                     event_fd;
-    int                     epfd;
-    struct epoll_event      *events;
 };
 
 enum {
@@ -68,14 +60,14 @@ struct backend_work_thread_table {
     int                     index;
     pthread_t               thread_id;
     char                    table_name[TABLE_NAME_LEN + 1];
-    pthread_mutex_t         mutex;    
-    
+    pthread_mutex_t         mutex;
+
     struct list_table       list_head[BACKEND_SOCKET_TYPE_MAX];
-    
+
     struct hash_table       hash;
     struct notify_table     notify;
-    
-    int                     event_fd;    
+
+    int                     event_fd;
     int                     epfd;
     struct epoll_event      *events;
 };
