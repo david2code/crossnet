@@ -57,13 +57,30 @@ void display_g_backend_buff_table()
 
 #endif
 
+void backend_move_node_to_list(struct backend_sk_node *sk, int type)
+{
+    DBG_PRINTF(DBG_NORMAL, "seq_id %u:%d list move %d --> %d\n",
+            sk->seq_id,
+            sk->fd,
+            sk->type,
+            type);
+
+    struct backend_work_thread_table *p_table = sk->p_my_table;
+    list_move(&sk->list_head, &p_table->list_head[type].list_head);
+    if (sk->type != type) {
+        p_table->list_head[sk->type].num--;
+        p_table->list_head[type].num++;
+        sk->type = type;
+    }
+}
+
 int backend_accept_init()
 {
     struct accept_socket_table *p_table = (struct accept_socket_table *)&g_backend_accept_socket_table;
 
     p_table->events = (struct epoll_event *)malloc(sizeof(struct epoll_event) * BACKEND_ACCEPT_EPOLL_MAX_EVENTS);
     if (p_table->events == NULL)
-	    exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
 
     p_table->epfd = epoll_create(BACKEND_ACCEPT_EPOLL_MAX_EVENTS);
 
@@ -71,13 +88,13 @@ int backend_accept_init()
     int server_socket_fd = create_listen_socket(listen_port, BACKEND_ACCEPT_LISTEN_BACKLOG);
     if (server_socket_fd < 0) {
         DBG_PRINTF(DBG_ERROR, "create listen socket failed at %d, errnum: %d\n",
-            listen_port,
-            server_socket_fd);
-	    exit(EXIT_FAILURE);
+                listen_port,
+                server_socket_fd);
+        exit(EXIT_FAILURE);
     } else {
         DBG_PRINTF(DBG_WARNING, "create listen socket success at %d, server_socket_fd: %d\n",
-            listen_port,
-            server_socket_fd);
+                listen_port,
+                server_socket_fd);
     }
 
     p_table->fd              = server_socket_fd;
@@ -114,11 +131,11 @@ void backend_sk_raw_del(struct backend_sk_node *sk)
     char ip_str[32];
     uint32_t ip = htonl(sk->ip);
     DBG_PRINTF(DBG_WARNING, "raw del socket %u:%d connect from %s:%d, last_active: %d, free send node: %d\n",
-        sk->seq_id,
-        sk->fd,
-        inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str)),
-        sk->port,
-        sk->last_active);
+            sk->seq_id,
+            sk->fd,
+            inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str)),
+            sk->port,
+            sk->last_active);
 
     free_backend_socket_node(sk);
 }
@@ -129,51 +146,51 @@ void backend_socket_read_cb(void *v)
 
     if (sk->status > SOCKET_STATUS_UNUSE_AFTER_SEND)
         return;
-    
+
     sk->last_active = time(NULL);
-    //manage_move_node_to_list(sk, sk->type);
+    backend_move_node_to_list(sk, sk->type);
     while(1) {
         if (sk->p_recv_node == NULL) {
             sk->p_recv_node = malloc_notify_node();
             if (sk->p_recv_node == NULL) {
                 DBG_PRINTF(DBG_WARNING, "socket %u:%d, no avaiable space, drop data!\n",
-                    sk->seq_id,
-                    sk->fd);
+                        sk->seq_id,
+                        sk->fd);
                 break;
             } else {
                 sk->p_recv_node->pos = 0;
                 sk->p_recv_node->end = 0;
             }
         }
-        
+
         uint16_t n_recv = sk->p_recv_node->end - sk->p_recv_node->pos;
         int to_recv;
-        
+
         if (n_recv < sizeof(struct backend_hdr)) {
             to_recv = sizeof(struct backend_hdr) - n_recv;
         } else {
             struct backend_hdr *p_hdr = (struct backend_hdr *)(sk->p_recv_node->buf + sk->p_recv_node->pos);
             if (p_hdr->magic != htons(BACKEND_MAGIC)) {
-                DBG_PRINTF(DBG_ERROR, "socket %u:%d, magic error: %hu\n", 
-                    sk->seq_id,
-                    sk->fd,
-                    htons(p_hdr->magic));
-                
+                DBG_PRINTF(DBG_ERROR, "socket %u:%d, magic error: %hu\n",
+                        sk->seq_id,
+                        sk->fd,
+                        htons(p_hdr->magic));
+
                 sk->p_recv_node->end = 0;
                 sk->exit_cb((void *)sk);
                 break;
             }
-            
+
             uint16_t total_len = ntohs(p_hdr->total_len);
             if ((total_len > (MAX_BUFF_SIZE - sk->p_recv_node->pos))
-                || (total_len < n_recv)) {
+                    || (total_len < n_recv)) {
                 DBG_PRINTF(DBG_ERROR, "socket %u:%d, critical nrecv: %hu, total_len: %hu, pos: %hu, end: %hu\n",
-                    sk->seq_id,
-                    sk->fd,
-                    n_recv,
-                    total_len,
-                    sk->p_recv_node->pos,
-                    sk->p_recv_node->end);
+                        sk->seq_id,
+                        sk->fd,
+                        n_recv,
+                        total_len,
+                        sk->p_recv_node->pos,
+                        sk->p_recv_node->end);
                 log_dump_hex((const uint8_t *)p_hdr, n_recv);
                 if (sk->exit_cb)
                     sk->exit_cb((void *)sk);
@@ -185,51 +202,229 @@ void backend_socket_read_cb(void *v)
                 //    sk->deal_read_data_cb(sk);
                 continue;
             }
-            
+
             to_recv = total_len - n_recv;
         }
-        
+
         int nread = recv(sk->fd, sk->p_recv_node->buf + sk->p_recv_node->end, to_recv, MSG_DONTWAIT);
         if (nread > 0) {
             sk->p_recv_node->end += nread;
             continue;
         }
-        
+
         if (nread == 0) {
-            DBG_PRINTF(DBG_NORMAL, "socket %u:%d closed by peer\n", 
-                sk->seq_id,
-                sk->fd);
+            DBG_PRINTF(DBG_NORMAL, "socket %u:%d closed by peer\n",
+                    sk->seq_id,
+                    sk->fd);
             sk->exit_cb((void *)sk);
             break;
         }
 
         if (errno == EAGAIN) {
             DBG_PRINTF(DBG_NORMAL, "socket %u:%d need recv next!\n",
-                sk->seq_id,
-                sk->fd);
+                    sk->seq_id,
+                    sk->fd);
             break;
         } else if (errno == EINTR) {
             DBG_PRINTF(DBG_ERROR, "socket %u:%d need recv again!\n",
-                sk->seq_id,
-                sk->fd);
+                    sk->seq_id,
+                    sk->fd);
             continue;
         } else {
             DBG_PRINTF(DBG_NORMAL, "socket %u:%d errno: %d\n",
-                sk->seq_id,
-                sk->fd,
-                errno);
+                    sk->seq_id,
+                    sk->fd,
+                    errno);
             sk->exit_cb((void *)sk);
             break;
         }
     }
 }
 
+void backend_socket_write_cb(void *v)
+{
+    struct backend_sk_node *sk = (struct backend_sk_node *)v;
+    struct backend_work_thread_table *p_table = sk->p_my_table;
+
+    int fd = sk->fd;
+    uint32_t seq_id = sk->seq_id;
+
+    if (sk->status > SOCKET_STATUS_UNUSE_AFTER_SEND) {
+        DBG_PRINTF(DBG_WARNING, "seq_id %u:%d status %d!\n",
+                seq_id,
+                fd,
+                sk->status);
+        return;
+    }
+
+    if (sk->blocked)
+        return;
+
+    struct list_head            *p_list = NULL;
+    struct list_head            *p_next = NULL;
+    list_for_each_safe(p_list, p_next, &sk->send_list) {
+        struct notify_node *p_entry = list_entry(p_list, struct notify_node, list_head);
+
+        DBG_PRINTF(DBG_NORMAL, "seq_id %u:%d, src_id: %u, send buf pos %hu, end %hu\n",
+                seq_id,
+                fd,
+                p_entry->type,
+                p_entry->src_id,
+                p_entry->pos,
+                p_entry->end);
+
+        int nwrite = 0;
+        int to_write = p_entry->end - p_entry->pos;
+        do {
+            p_entry->pos = p_entry->pos + nwrite;
+            to_write = p_entry->end - p_entry->pos;
+            if (to_write == 0)
+                break;
+
+            nwrite = send(fd, p_entry->buf + p_entry->pos, to_write, 0);
+
+            if (g_main_debug >= DBG_NORMAL) {
+                log_dump_hex(p_entry->buf + p_entry->pos, to_write);
+                DBG_PRINTF(DBG_CLOSE, "seq_id %u:%d nwrite: %d, front_listen_id %u\n",
+                        seq_id,
+                        fd,
+                        nwrite,
+                        sk->front_listen_id);
+            }
+        } while(nwrite > 0);
+
+        if (to_write == 0) {
+            DBG_PRINTF(DBG_NORMAL, "seq_id %u:%d no data to write!\n",
+                    seq_id,
+                    fd);
+
+            list_del(&p_entry->list_head);
+            free_notify_node(p_entry);
+            continue;
+        }
+
+        if (nwrite < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                DBG_PRINTF(DBG_WARNING, "seq_id %u:%d cannot write!\n",
+                        seq_id,
+                        fd);
+                modify_event(p_table->epfd, fd, (void *)sk, EPOLLIN | EPOLLOUT);// | EPOLLET);
+                sk->blocked = 1;
+                goto WRITE_EXIT;
+            } else {
+                DBG_PRINTF(DBG_ERROR, "seq_id %u:%d errno: %d, error msg: %s!\n",
+                        seq_id,
+                        fd,
+                        errno,
+                        strerror(errno));
+                sk->exit_cb((void *)sk);
+                return;
+            }
+        } else {
+            DBG_PRINTF(DBG_ERROR, "critical seq_id %u:%d, nwrite: %d, to_write: %d\n",
+                    seq_id,
+                    fd,
+                    nwrite,
+                    to_write);
+            sk->exit_cb((void *)sk);
+            return;
+        }
+    }
+
+    if (sk->status == SOCKET_STATUS_UNUSE_AFTER_SEND) {
+        sk->exit_cb((void *)sk);
+    } else {
+        modify_event(p_table->epfd, fd, (void *)sk, EPOLLIN);// | EPOLLET);
+    }
+
+WRITE_EXIT:
+    return;
+}
+
+void backend_socket_exit_cb(void *v)
+{
+    struct backend_sk_node *sk = (struct backend_sk_node *)v;
+    struct backend_work_thread_table *p_table = sk->p_my_table;
+
+    if (sk->status == SOCKET_STATUS_DEL) {
+        DBG_PRINTF(DBG_ERROR, "user %u seq_id %u:%d front_listen_id:%u critical error alread del\n",
+                sk->user_block_id,
+                sk->seq_id,
+                sk->fd,
+                sk->front_listen_id);
+        return;
+    }
+
+    delete_event(p_table->epfd, sk->fd, sk, EPOLLIN | EPOLLOUT);
+
+    close(sk->fd);
+    sk->status = SOCKET_STATUS_DEL;
+
+    if (sk->id_hash_node.prev != NULL) {
+        list_del(&sk->id_hash_node);
+        sk->id_hash_node.prev = sk->id_hash_node.next = NULL;
+    }
+
+    backend_move_node_to_list(sk, BACKEND_SOCKET_TYPE_DEL);
+    if (g_main_debug >= DBG_NORMAL) {
+        char ip_str[30];
+        uint32_t ip = htonl(sk->ip);
+        DBG_PRINTF(DBG_WARNING, "exit seq_id %u:%d front_listen_id:%u connect from %s:%d, alive_cnt: %u, ttl: %d\n",
+                sk->seq_id,
+                sk->fd,
+                sk->front_listen_id,
+                inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str)),
+                sk->port,
+                sk->alive_cnt,
+                time(NULL) - sk->last_active);
+    }
+}
+
+void backend_socket_del_cb(void *v)
+{
+    struct backend_sk_node *sk = (struct backend_sk_node *)v;
+    struct backend_work_thread_table *p_table = sk->p_my_table;
+
+    if (sk->type != BACKEND_SOCKET_TYPE_DEL) {
+        DBG_PRINTF(DBG_ERROR, "user %u critical error %u:%d last_active: %d type: %hhu status: %hhu\n",
+                sk->seq_id,
+                sk->fd,
+                sk->last_active,
+                sk->type,
+                sk->status);
+    }
+
+    struct list_table *p_list_table = &p_table->list_head[sk->type];
+
+    list_del(&sk->list_head);
+    p_list_table->num--;
+
+    if (sk->p_recv_node) {
+        free_notify_node(sk->p_recv_node);
+        sk->p_recv_node = NULL;
+    }
+
+    struct list_head            *p_list = NULL;
+    struct list_head            *p_next = NULL;
+    list_for_each_safe(p_list, p_next, &sk->send_list) {
+        struct notify_node *p_entry = list_entry(p_list, struct notify_node, list_head);
+        list_del(&p_entry->list_head);
+        free_notify_node(p_entry);
+    }
+
+    DBG_PRINTF(DBG_NORMAL, "user %u del socket %u:%d free send node: %d\n",
+            sk->seq_id,
+            sk->fd);
+
+    free_backend_socket_node(sk);
+}
+
 void backend_notify_add_new_socket_node(struct backend_work_thread_table *p_table, struct backend_sk_node *p_node)
 {
     if (-1 == DHASH_INSERT(p_backend_work_thread_table_array, &p_table->hash, p_node)) {
         DBG_PRINTF(DBG_ERROR, "new socket %u:%d exist!\n",
-            p_node->seq_id,
-            p_node->fd);
+                p_node->seq_id,
+                p_node->fd);
         backend_sk_raw_del(p_node);
         return;
     }
@@ -241,9 +436,9 @@ void backend_notify_add_new_socket_node(struct backend_work_thread_table *p_tabl
     p_node->type            = BACKEND_SOCKET_TYPE_READY;
     p_node->blocked         = 0;
     p_node->read_cb         = backend_socket_read_cb;
-    //p_node->write_cb        = backend_socket_write_cb;
-    //p_node->exit_cb         = backend_socket_exit_cb;
-    //p_node->del_cb          = backend_socket_del_cb;
+    p_node->write_cb        = backend_socket_write_cb;
+    p_node->exit_cb         = backend_socket_exit_cb;
+    p_node->del_cb          = backend_socket_del_cb;
 
     struct list_table *p_list_table = &p_table->list_head[BACKEND_SOCKET_TYPE_READY];
     list_add_fe(&p_node->list_head, &p_list_table->list_head);
@@ -253,8 +448,8 @@ void backend_notify_add_new_socket_node(struct backend_work_thread_table *p_tabl
     add_event(p_table->epfd, p_node->fd, p_node, EPOLLIN);
 
     DBG_PRINTF(DBG_NORMAL, "new socket %d seq_id %u success\n",
-        p_node->seq_id,
-        p_node->fd);
+            p_node->seq_id,
+            p_node->fd);
 }
 
 void backend_event_read_cb(void *v)
@@ -327,7 +522,7 @@ void backend_thread_event_init(struct backend_work_thread_table *p_table)
 {
     p_table->events = (struct epoll_event *)malloc(sizeof(struct epoll_event) * BACKEND_THREAD_EPOLL_MAX_EVENTS);
     if (p_table->events == NULL)
-	    exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
 
     p_table->epfd = epoll_create(BACKEND_THREAD_EPOLL_MAX_EVENTS);
     DBG_PRINTF(DBG_WARNING, "epfd %d\n", p_table->epfd);
@@ -335,16 +530,16 @@ void backend_thread_event_init(struct backend_work_thread_table *p_table)
     p_table->event_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
     if (p_table->event_fd < 0) {
         DBG_PRINTF(DBG_WARNING, "create event_fd failed, ret %d!\n",
-            p_table->event_fd);
-	    exit(EXIT_FAILURE);
+                p_table->event_fd);
+        exit(EXIT_FAILURE);
     }
 
     struct backend_sk_node *p_node = malloc_backend_socket_node();
     if (p_node == NULL) {
         DBG_PRINTF(DBG_ERROR, "event_fd failed at :%d, mem use out\n",
-            p_table->event_fd);
+                p_table->event_fd);
         close(p_table->event_fd);
-	    exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
 
     p_node->fd              = p_table->event_fd;
@@ -364,7 +559,7 @@ void backend_thread_event_init(struct backend_work_thread_table *p_table)
     add_event(p_table->epfd, p_node->fd, p_node, EPOLLIN);
 
     DBG_PRINTF(DBG_WARNING, "add event_fd %d success!\n",
-        p_table->event_fd);
+            p_table->event_fd);
 }
 
 void *backend_thread_socket_process(void *arg)
@@ -374,26 +569,26 @@ void *backend_thread_socket_process(void *arg)
 
     prctl(PR_SET_NAME, p_table->table_name);
 
-	DBG_PRINTF(DBG_WARNING, "%s enter timerstamp %d\n", p_table->table_name, last_time);
+    DBG_PRINTF(DBG_WARNING, "%s enter timerstamp %d\n", p_table->table_name, last_time);
 
-	while(g_main_running) {
+    while(g_main_running) {
         int nfds = epoll_wait(p_table->epfd, p_table->events, BACKEND_THREAD_EPOLL_MAX_EVENTS, 1 * 1000);
 
         int i;
         for( i= 0; i < nfds; ++i) {
-			struct backend_sk_node *sk = (struct backend_sk_node *)(p_table->events[i].data.ptr);
+            struct backend_sk_node *sk = (struct backend_sk_node *)(p_table->events[i].data.ptr);
 
             if(p_table->events[i].events & EPOLLIN) {
                 sk->read_cb((void *)sk);
             } else if(p_table->events[i].events & EPOLLOUT) {
-                    sk->blocked = 0;
-                    sk->write_cb((void *)sk);
+                sk->blocked = 0;
+                sk->write_cb((void *)sk);
             } else {
                 DBG_PRINTF(DBG_ERROR, "%u:%d, type:%d unknown event: %d\n",
-                    sk->seq_id,
-                    sk->fd,
-                    sk->type,
-                    p_table->events[i].events);
+                        sk->seq_id,
+                        sk->fd,
+                        sk->type,
+                        p_table->events[i].events);
             }
         }
 
@@ -409,11 +604,11 @@ void *backend_thread_socket_process(void *arg)
 
         manage_del_process(&p_table->list_head[MANAGE_UNUSE_SOCKET_TYPE_DEL], p_table->table_name);
 #endif
-	}
+    }
 
-	DBG_PRINTF(DBG_WARNING, "leave timestamp %d\n", time(NULL));
+    DBG_PRINTF(DBG_WARNING, "leave timestamp %d\n", time(NULL));
 
-	exit(EXIT_SUCCESS);
+    exit(EXIT_SUCCESS);
 }
 
 int backend_thread_pool_init()
@@ -422,7 +617,7 @@ int backend_thread_pool_init()
 
     p_backend_work_thread_table_array = (struct backend_work_thread_table *)malloc(sizeof(struct backend_work_thread_table) * BACKEND_WORK_THREAD_NUM);
     if (p_backend_work_thread_table_array == NULL)
-	    exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
 
     for (i = 0; i < BACKEND_WORK_THREAD_NUM; i++) {
         p_backend_work_thread_table_array[i].index = i;
@@ -463,7 +658,7 @@ inline void backend_event_notify(int event_fd)
     uint64_t notify = 1;
     if (write(event_fd, &notify, sizeof(notify)) < 0) {
         DBG_PRINTF(DBG_WARNING, "event_fd %d, write error!\n",
-            event_fd);
+                event_fd);
     }
 }
 
@@ -491,8 +686,8 @@ void backend_socket_handle_accpet_cb()
 
     if (new_socket < 0) {
         DBG_PRINTF(DBG_ERROR, "Accept Failed! error no: %d, error msg: %s\n",
-            errno,
-            strerror(errno));
+                errno,
+                strerror(errno));
         return;
     }
 
@@ -500,9 +695,9 @@ void backend_socket_handle_accpet_cb()
     if (p_node == NULL) {
         char ip_str[32];
         DBG_PRINTF(DBG_ERROR, "new socket %d connect from %s:%hu failed\n",
-            new_socket,
-            inet_ntop(AF_INET, &client_addr.sin_addr.s_addr, ip_str, sizeof(ip_str)),
-            client_addr.sin_port);
+                new_socket,
+                inet_ntop(AF_INET, &client_addr.sin_addr.s_addr, ip_str, sizeof(ip_str)),
+                client_addr.sin_port);
         close(new_socket);
         return;
     }
@@ -528,18 +723,18 @@ void backend_socket_handle_accpet_cb()
 
         char ip_str[32];
         DBG_PRINTF(DBG_CLOSE, "new socket %d seq_id %u connect from %s:%hu failed\n",
-            new_socket,
-            p_node->seq_id,
-            inet_ntop(AF_INET, &client_addr.sin_addr.s_addr, ip_str, sizeof(ip_str)),
-            client_addr.sin_port);
+                new_socket,
+                p_node->seq_id,
+                inet_ntop(AF_INET, &client_addr.sin_addr.s_addr, ip_str, sizeof(ip_str)),
+                client_addr.sin_port);
         return;
     } else {
         char ip_str[32];
         DBG_PRINTF(DBG_NORMAL, "new socket %d seq_id %u connect from %s:%hu success\n",
-            new_socket,
-            p_node->seq_id,
-            inet_ntop(AF_INET, &client_addr.sin_addr.s_addr, ip_str, sizeof(ip_str)),
-            client_addr.sin_port);
+                new_socket,
+                p_node->seq_id,
+                inet_ntop(AF_INET, &client_addr.sin_addr.s_addr, ip_str, sizeof(ip_str)),
+                client_addr.sin_port);
     }
 }
 
@@ -549,9 +744,9 @@ void *backend_accept_process(void *arg)
 
     prctl(PR_SET_NAME, __FUNCTION__);
 
-	DBG_PRINTF(DBG_WARNING, "enter timerstamp %d\n", time(NULL));
+    DBG_PRINTF(DBG_WARNING, "enter timerstamp %d\n", time(NULL));
 
-	while(g_main_running) {
+    while(g_main_running) {
         int nfds = epoll_wait(p_table->epfd, p_table->events, BACKEND_ACCEPT_EPOLL_MAX_EVENTS, -1);
 
         int i;
@@ -560,13 +755,13 @@ void *backend_accept_process(void *arg)
                 backend_socket_handle_accpet_cb();
             } else {
                 DBG_PRINTF(DBG_ERROR, "backend: %d, unknown event: %d\n",
-                    p_table->fd,
-                    p_table->events[i].events);
+                        p_table->fd,
+                        p_table->events[i].events);
             }
         }
-	}
+    }
 
-	DBG_PRINTF(DBG_WARNING, "leave timestamp %d\n", time(NULL));
+    DBG_PRINTF(DBG_WARNING, "leave timestamp %d\n", time(NULL));
 
-	exit(EXIT_SUCCESS);
+    exit(EXIT_SUCCESS);
 }
