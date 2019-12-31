@@ -75,11 +75,19 @@ struct backend_work_thread_table {
 #define BACKEND_MAGIC           0x5a5a
 #define MAX_IP_PROXY_HDR_SIZE   300
 
+enum msg_type {
+    MSG_TYPE_HEART_BEAT,
+    MSG_TYPE_HEART_BEAT_ACK,
+    MSG_TYPE_MAX,
+};
+
 struct backend_hdr {
     uint16_t  magic;
     uint8_t   type;
     uint16_t  total_len;
 }__attribute__((packed));
+
+#define BACKEND_HDR_LEN (sizeof(struct backend_hdr))
 
 int backend_init();
 void *backend_accept_process(void *arg);

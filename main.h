@@ -16,6 +16,10 @@
 #define TABLE_NAME_LEN  50
 #define MAX_BUFF_SIZE            2048
 
+#define SUCCESS    0
+#define FAIL       -1
+#define NEED_MORE  -2
+
 enum socket_status {
     SOCKET_STATUS_NEW = 0,
     SOCKET_STATUS_EXIT_AFTER_SEND,/* socket需要被关闭 */

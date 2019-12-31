@@ -166,8 +166,8 @@ void backend_socket_read_cb(void *v)
         uint16_t n_recv = sk->p_recv_node->end - sk->p_recv_node->pos;
         int to_recv;
 
-        if (n_recv < sizeof(struct backend_hdr)) {
-            to_recv = sizeof(struct backend_hdr) - n_recv;
+        if (n_recv < BACKEND_HDR_LEN) {
+            to_recv = BACKEND_HDR_LEN - n_recv;
         } else {
             struct backend_hdr *p_hdr = (struct backend_hdr *)(sk->p_recv_node->buf + sk->p_recv_node->pos);
             if (p_hdr->magic != htons(BACKEND_MAGIC)) {
@@ -200,6 +200,8 @@ void backend_socket_read_cb(void *v)
             if (n_recv == total_len)
             {
                 //    sk->deal_read_data_cb(sk);
+                log_dump_hex((const uint8_t *)sk->p_recv_node->buf + sk->p_recv_node->pos, sk->p_recv_node->end - sk->p_recv_node->pos);
+                sk->p_recv_node->end = sk->p_recv_node->pos = 0;
                 continue;
             }
 
