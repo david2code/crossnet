@@ -17,9 +17,8 @@ struct notify_table {
 enum pipe_notify_type {
     PIPE_NOTIFY_TYPE_SOCKET_NODE,
     PIPE_NOTIFY_TYPE_PAIRS_INFO,
-    PIPE_NOTIFY_TYPE_SELF_SEND,/* socket通知自己将数据发送出去*/
-    PIPE_NOTIFY_TYPE_SEND,/* socket通知对方将数据发送出去*/
-    PIPE_NOTIFY_TYPE_FREE,/* socket通知对方释放掉自己，状态由占用变为未占用 */
+    PIPE_NOTIFY_TYPE_SEND,
+    PIPE_NOTIFY_TYPE_FREE,
     PIPE_NOTIFY_TYPE_MAX
 };
 

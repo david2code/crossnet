@@ -72,12 +72,13 @@ struct backend_work_thread_table {
     struct epoll_event      *events;
 };
 
-#define BACKEND_MAGIC           0x5a5a
-#define MAX_IP_PROXY_HDR_SIZE   300
+#define BACKEND_MAGIC               0x5a5a
+#define BACKEND_RESERVE_HDR_SIZE    100
 
 enum msg_type {
     MSG_TYPE_HEART_BEAT,
     MSG_TYPE_HEART_BEAT_ACK,
+    MSG_TYPE_SEND_DATA,
     MSG_TYPE_MAX,
 };
 
@@ -89,7 +90,13 @@ struct backend_hdr {
 
 #define BACKEND_HDR_LEN (sizeof(struct backend_hdr))
 
+struct backend_data {
+    uint32_t  src_id;/*发送者的ID*/
+}__attribute__((packed));
+
 int backend_init();
 void *backend_accept_process(void *arg);
+
+int backend_notify_send_data(struct notify_node *p_notify_node, uint32_t src_id, uint32_t dst_id);
 
 #endif

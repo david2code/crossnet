@@ -19,6 +19,7 @@
 #include "main.h"
 #include "log.h"
 #include "frontend.h"
+#include "backend.h"
 #include "buff.h"
 #include "unique_id.h"
 #include "misc.h"
@@ -140,6 +141,16 @@ void frontend_sk_raw_del(struct frontend_sk_node *sk)
     free_frontend_socket_node(sk);
 }
 
+
+int frontend_http_process(struct frontend_sk_node *sk)
+{
+    struct notify_node *p_notify_node = sk->p_recv_node;
+    sk->p_recv_node = NULL;
+
+    backend_notify_send_data(p_notify_node, sk->seq_id, 0);
+    return 0;
+}
+
 void frontend_socket_read_cb(void *v)
 {
     struct frontend_sk_node *sk = (struct frontend_sk_node *)v;
@@ -150,27 +161,27 @@ void frontend_socket_read_cb(void *v)
     sk->last_active = time(NULL);
     frontend_move_node_to_list(sk, sk->type);
     while(1) {
-        if (sk->p_recv_node == NULL) {
-            sk->p_recv_node = malloc_notify_node();
-            if (sk->p_recv_node == NULL) {
+        struct notify_node *p_recv_node = sk->p_recv_node;
+        if (p_recv_node == NULL) {
+            p_recv_node = malloc_notify_node();
+            if (p_recv_node == NULL) {
                 DBG_PRINTF(DBG_WARNING, "socket %u:%d, no avaiable space, drop data!\n",
                         sk->seq_id,
                         sk->fd);
                 break;
             } else {
-                sk->p_recv_node->pos = 0;
-                sk->p_recv_node->end = 0;
+                p_recv_node->pos = p_recv_node->end = BACKEND_RESERVE_HDR_SIZE;
+                sk->p_recv_node = p_recv_node;
             }
         }
 
-        uint16_t n_recv = sk->p_recv_node->end - sk->p_recv_node->pos;
+        uint16_t n_recv = p_recv_node->end - p_recv_node->pos;
         uint16_t to_recv = MAX_BUFF_SIZE - n_recv;
 
-        int nread = recv(sk->fd, sk->p_recv_node->buf + sk->p_recv_node->end, to_recv, MSG_DONTWAIT);
+        int nread = recv(sk->fd, p_recv_node->buf + p_recv_node->end, to_recv, MSG_DONTWAIT);
         if (nread > 0) {
-            sk->p_recv_node->end += nread;
-            if (sk->p_recv_node->end == MAX_BUFF_SIZE)
-                log_dump_hex(sk->p_recv_node->buf, sk->p_recv_node->end - sk->p_recv_node->pos);
+            p_recv_node->end += nread;
+            frontend_http_process(sk);
             continue;
         }
 
@@ -186,7 +197,7 @@ void frontend_socket_read_cb(void *v)
             DBG_PRINTF(DBG_NORMAL, "socket %u:%d need recv next!\n",
                     sk->seq_id,
                     sk->fd);
-            log_dump_hex(sk->p_recv_node->buf, sk->p_recv_node->end - sk->p_recv_node->pos);
+            log_dump_hex(p_recv_node->buf, p_recv_node->end - p_recv_node->pos);
             break;
         } else if (errno == EINTR) {
             DBG_PRINTF(DBG_ERROR, "socket %u:%d need recv again!\n",

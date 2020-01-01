@@ -27,6 +27,7 @@
 
 struct accept_socket_table g_backend_accept_socket_table;
 
+int g_debug_backend_id = 0;
 #if 1
 
 struct buff_table g_backend_socket_buff_table;
@@ -140,6 +141,46 @@ void backend_sk_raw_del(struct backend_sk_node *sk)
     free_backend_socket_node(sk);
 }
 
+/*
+ * 直接将心跳请求包修改成心跳响应包
+ * */
+int backend_notify_make_heart_beat_ack(struct backend_sk_node *sk)
+{
+    struct notify_node *p_notify_node = sk->p_recv_node;
+    if (p_notify_node == NULL) {
+        return FAIL;
+    }
+    sk->p_recv_node = NULL;
+    p_notify_node->type = PIPE_NOTIFY_TYPE_SEND;
+
+    struct backend_hdr *p_hdr = (struct backend_hdr *)(p_notify_node->buf + p_notify_node->pos);
+    p_hdr->type = MSG_TYPE_HEART_BEAT_ACK;
+
+    list_add_tail(&p_notify_node->list_head, &sk->send_list);
+    sk->write_cb(sk);
+    return 0;
+}
+
+int backend_deal_read_data_process(struct backend_sk_node *sk)
+{
+    struct notify_node *p_recv_node = sk->p_recv_node;
+    struct backend_hdr *p_hdr = (struct backend_hdr *)(p_recv_node->buf + p_recv_node->pos);
+
+    switch (p_hdr->type) {
+    case MSG_TYPE_HEART_BEAT:
+        backend_notify_make_heart_beat_ack(sk);
+        break;
+
+    case MSG_TYPE_SEND_DATA:
+        break;
+
+    default:
+        break;
+    }
+
+    return SUCCESS;
+}
+
 void backend_socket_read_cb(void *v)
 {
     struct backend_sk_node *sk = (struct backend_sk_node *)v;
@@ -150,58 +191,56 @@ void backend_socket_read_cb(void *v)
     sk->last_active = time(NULL);
     backend_move_node_to_list(sk, sk->type);
     while(1) {
-        if (sk->p_recv_node == NULL) {
-            sk->p_recv_node = malloc_notify_node();
-            if (sk->p_recv_node == NULL) {
+        struct notify_node *p_recv_node = sk->p_recv_node;
+        if (p_recv_node == NULL) {
+            p_recv_node = malloc_notify_node();
+            if (p_recv_node == NULL) {
                 DBG_PRINTF(DBG_WARNING, "socket %u:%d, no avaiable space, drop data!\n",
                         sk->seq_id,
                         sk->fd);
                 break;
             } else {
-                sk->p_recv_node->pos = 0;
-                sk->p_recv_node->end = 0;
+                p_recv_node->pos = p_recv_node->end = 0;
+                sk->p_recv_node = p_recv_node;
             }
         }
 
-        uint16_t n_recv = sk->p_recv_node->end - sk->p_recv_node->pos;
+        uint16_t n_recv = p_recv_node->end - p_recv_node->pos;
         int to_recv;
 
         if (n_recv < BACKEND_HDR_LEN) {
             to_recv = BACKEND_HDR_LEN - n_recv;
         } else {
-            struct backend_hdr *p_hdr = (struct backend_hdr *)(sk->p_recv_node->buf + sk->p_recv_node->pos);
+            struct backend_hdr *p_hdr = (struct backend_hdr *)(p_recv_node->buf + p_recv_node->pos);
             if (p_hdr->magic != htons(BACKEND_MAGIC)) {
                 DBG_PRINTF(DBG_ERROR, "socket %u:%d, magic error: %hu\n",
                         sk->seq_id,
                         sk->fd,
                         htons(p_hdr->magic));
 
-                sk->p_recv_node->end = 0;
+                p_recv_node->end = 0;
                 sk->exit_cb((void *)sk);
                 break;
             }
 
             uint16_t total_len = ntohs(p_hdr->total_len);
-            if ((total_len > (MAX_BUFF_SIZE - sk->p_recv_node->pos))
+            if ((total_len > (MAX_BUFF_SIZE - p_recv_node->pos))
                     || (total_len < n_recv)) {
                 DBG_PRINTF(DBG_ERROR, "socket %u:%d, critical nrecv: %hu, total_len: %hu, pos: %hu, end: %hu\n",
                         sk->seq_id,
                         sk->fd,
                         n_recv,
                         total_len,
-                        sk->p_recv_node->pos,
-                        sk->p_recv_node->end);
+                        p_recv_node->pos,
+                        p_recv_node->end);
                 log_dump_hex((const uint8_t *)p_hdr, n_recv);
-                if (sk->exit_cb)
-                    sk->exit_cb((void *)sk);
+                sk->exit_cb((void *)sk);
                 break;
             }
 
-            if (n_recv == total_len)
-            {
-                //    sk->deal_read_data_cb(sk);
-                log_dump_hex((const uint8_t *)sk->p_recv_node->buf + sk->p_recv_node->pos, sk->p_recv_node->end - sk->p_recv_node->pos);
-                sk->p_recv_node->end = sk->p_recv_node->pos = 0;
+            if (n_recv == total_len) {
+                log_dump_hex((const uint8_t *)p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
+                backend_deal_read_data_process(sk);
                 continue;
             }
 
@@ -421,7 +460,7 @@ void backend_socket_del_cb(void *v)
     free_backend_socket_node(sk);
 }
 
-void backend_notify_add_new_socket_node(struct backend_work_thread_table *p_table, struct backend_sk_node *p_node)
+void backend_event_socket_node(struct backend_work_thread_table *p_table, struct backend_sk_node *p_node)
 {
     if (-1 == DHASH_INSERT(p_backend_work_thread_table_array, &p_table->hash, p_node)) {
         DBG_PRINTF(DBG_ERROR, "new socket %u:%d exist!\n",
@@ -454,6 +493,28 @@ void backend_notify_add_new_socket_node(struct backend_work_thread_table *p_tabl
             p_node->fd);
 }
 
+void backend_event_send(struct backend_work_thread_table *p_table, struct notify_node *p_notify_node)
+{
+    struct backend_sk_node *sk = DHASH_FIND(p_backend_work_thread_table_array, &p_table->hash, &p_notify_node->dst_id);
+    if (sk == NULL) {
+        DBG_PRINTF(DBG_NORMAL, "src_id %u -> dst_id %u unfound!\n",
+            p_notify_node->src_id,
+            p_notify_node->dst_id); 
+        free_notify_node(p_notify_node);
+        //todo notify peer id not found
+        
+        return;
+    }
+
+    DBG_PRINTF(DBG_NORMAL, "src_id %u -> dst_id %u send!\n",
+        p_notify_node->src_id,
+        p_notify_node->dst_id); 
+        
+    list_add_tail(&p_notify_node->list_head, &sk->send_list);
+    sk->write_cb(sk);
+    
+}
+
 void backend_event_read_cb(void *v)
 {
     struct backend_sk_node *sk = (struct backend_sk_node *)v;
@@ -469,10 +530,10 @@ void backend_event_read_cb(void *v)
             }
 
             struct notify_node *p_entry;
-            while((p_entry = notify_table_get(&p_my_table->notify))) {
-                switch(p_entry->type) {
+            while ((p_entry = notify_table_get(&p_my_table->notify))) {
+                switch (p_entry->type) {
                 case PIPE_NOTIFY_TYPE_SEND:
-                    //manage_unuse_notify_send_data(p_my_table, p_entry);
+                    backend_event_send(p_my_table, p_entry);
                     break;
 
                 case PIPE_NOTIFY_TYPE_FREE:
@@ -480,7 +541,7 @@ void backend_event_read_cb(void *v)
                     break;
 
                 case PIPE_NOTIFY_TYPE_SOCKET_NODE:
-                    backend_notify_add_new_socket_node(p_my_table, (struct backend_sk_node *)p_entry->p_node);
+                    backend_event_socket_node(p_my_table, (struct backend_sk_node *)p_entry->p_node);
                     free_notify_node(p_entry);
                     break;
 
@@ -679,6 +740,33 @@ int backend_notify_new_socket(struct backend_sk_node *p_node)
     return 0;
 }
 
+int backend_notify_send_data(struct notify_node *p_notify_node, uint32_t src_id, uint32_t dst_id)
+{
+    p_notify_node->type   = PIPE_NOTIFY_TYPE_SEND;
+    p_notify_node->dst_id = g_debug_backend_id;
+
+    uint16_t control_len = BACKEND_HDR_LEN + sizeof(struct backend_data);
+    if (control_len > p_notify_node->pos) {
+        return -1;
+    }
+
+    uint16_t total_len = control_len + (p_notify_node->end - p_notify_node->pos);
+    p_notify_node->pos -= control_len;
+    struct backend_hdr *p_hdr = (struct backend_hdr *)(p_notify_node->buf + p_notify_node->pos);
+    p_hdr->magic        = htons(BACKEND_MAGIC);
+    p_hdr->type         = MSG_TYPE_SEND_DATA;
+    p_hdr->total_len    = htons(total_len);
+
+    struct backend_data *p_data = (struct backend_data *)(p_hdr + 1);
+    p_data->src_id = htonl(src_id);
+
+    int index = p_notify_node->dst_id % BACKEND_WORK_THREAD_NUM;
+    notify_table_put_tail(&p_backend_work_thread_table_array[index].notify, p_notify_node);
+    backend_event_notify(p_backend_work_thread_table_array[index].event_fd);
+    return 0;
+}
+
+
 void backend_socket_handle_accpet_cb()
 {
     struct accept_socket_table *p_table = (struct accept_socket_table *)&g_backend_accept_socket_table;
@@ -704,6 +792,7 @@ void backend_socket_handle_accpet_cb()
         return;
     }
 
+    g_debug_backend_id = p_node->seq_id;
     uint32_t ip = ntohl(client_addr.sin_addr.s_addr);
 
     p_node->mac_hash_node.prev = p_node->mac_hash_node.next = NULL;
