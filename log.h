@@ -31,5 +31,10 @@ extern const char *g_dbg_level_str[DBG_MAX];
 
 #define DBG_RAW_PRINTF(fmt...)  io_printf2(fmt);
 
+#define DBG_DUMP_HEX(dbg_level, fmt...) { \
+    if (dbg_level <= g_main_debug) \
+        log_dump_hex(fmt);\
+}
+
 #endif
 

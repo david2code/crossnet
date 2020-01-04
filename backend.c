@@ -241,13 +241,13 @@ void backend_socket_read_cb(void *v)
                         total_len,
                         p_recv_node->pos,
                         p_recv_node->end);
-                log_dump_hex((const uint8_t *)p_hdr, n_recv);
+                DBG_DUMP_HEX(DBG_NORMAL, (const uint8_t *)p_hdr, n_recv);
                 sk->exit_cb((void *)sk);
                 break;
             }
 
             if (n_recv == total_len) {
-                log_dump_hex((const uint8_t *)p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
+                DBG_DUMP_HEX(DBG_NORMAL, (const uint8_t *)p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
                 backend_deal_read_data_process(sk);
                 continue;
             }

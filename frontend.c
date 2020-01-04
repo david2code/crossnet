@@ -175,8 +175,7 @@ void frontend_socket_read_cb(void *v)
             }
         }
 
-        uint16_t n_recv = p_recv_node->end - p_recv_node->pos;
-        uint16_t to_recv = MAX_BUFF_SIZE - n_recv;
+        uint16_t to_recv = MAX_BUFF_SIZE - p_recv_node->end;
 
         int nread = recv(sk->fd, p_recv_node->buf + p_recv_node->end, to_recv, MSG_DONTWAIT);
         if (nread > 0) {
@@ -197,7 +196,6 @@ void frontend_socket_read_cb(void *v)
             DBG_PRINTF(DBG_NORMAL, "socket %u:%d need recv next!\n",
                     sk->seq_id,
                     sk->fd);
-            log_dump_hex(p_recv_node->buf, p_recv_node->end - p_recv_node->pos);
             break;
         } else if (errno == EINTR) {
             DBG_PRINTF(DBG_ERROR, "socket %u:%d need recv again!\n",
