@@ -4,19 +4,24 @@
 #include "kernel_list.h"
 #include "hash_table.h"
 #include "notify.h"
+#include "heaptimer.h"
 
-#define BACKEND_SOCKET_MAX_NUM         5000
-#define BACKEND_THREAD_HASH_SIZE       (BACKEND_SOCKET_MAX_NUM / BACKEND_WORK_THREAD_NUM)
+#define BACKEND_SOCKET_MAX_NUM              5000
+#define BACKEND_THREAD_HASH_SIZE            ((BACKEND_SOCKET_MAX_NUM / BACKEND_WORK_THREAD_NUM) / 2)
 
-#define BACKEND_ACCEPT_EPOLL_MAX_EVENTS     5000
-#define BACKEND_ACCEPT_LISTEN_BACKLOG       500
+#define BACKEND_ACCEPT_EPOLL_MAX_EVENTS     (BACKEND_SOCKET_MAX_NUM / 3)
+#define BACKEND_ACCEPT_LISTEN_BACKLOG       (BACKEND_ACCEPT_EPOLL_MAX_EVENTS)
 
-#define BACKEND_THREAD_EPOLL_MAX_EVENTS  (BACKEND_ACCEPT_EPOLL_MAX_EVENTS / BACKEND_WORK_THREAD_NUM)
-#define BACKEND_THREAD_LISTEN_BACKLOG  (BACKEND_ACCEPT_LISTEN_BACKLOG / BACKEND_WORK_THREAD_NUM)
+#define BACKEND_THREAD_EPOLL_MAX_EVENTS     (BACKEND_ACCEPT_EPOLL_MAX_EVENTS / BACKEND_WORK_THREAD_NUM)
+#define BACKEND_THREAD_LISTEN_BACKLOG       (BACKEND_ACCEPT_LISTEN_BACKLOG / BACKEND_WORK_THREAD_NUM)
+
+#define BACKEND_NOTIFY_MAX_NODE             (BACKEND_SOCKET_MAX_NUM)
+
+#define BACKEND_HEAP_MAX_SIZE               (BACKEND_SOCKET_MAX_NUM)
+#define BACKEND_HEAP_INVALID_HOLE           (BACKEND_HEAP_MAX_SIZE + 1)
 
 struct backend_sk_node {
     struct list_head    list_head;
-    struct list_head    mac_hash_node;
     struct list_head    id_hash_node;
 
     int                 fd;
@@ -44,6 +49,8 @@ struct backend_sk_node {
     uint32_t            quality;
     uint32_t            delay_ms;
 
+    struct heap_timer   timer;
+
     void                (*read_cb)(void *v);
     void                (*write_cb)(void *v);
     void                (*exit_cb)(void *v);
@@ -70,6 +77,8 @@ struct backend_work_thread_table {
     int                     event_fd;
     int                     epfd;
     struct epoll_event      *events;
+
+    struct heap_tree        heap;
 };
 
 #define BACKEND_MAGIC               0x5a5a

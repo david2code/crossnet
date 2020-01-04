@@ -18,13 +18,14 @@ struct heap_tree {
     struct heap_timer   **array;
     int                 size;
     int                 cur_size;
-    pthread_mutex_t     mutex;
+    //pthread_mutex_t     mutex;
 };
 
 int init_heap_timer(struct heap_tree *p_heap_tree, int size);
 int add_heap_timer(struct heap_tree *p_heap_tree, struct heap_timer *p_new_timer);
 struct heap_timer *top_heap_timer(struct heap_tree *p_heap_tree);
 struct heap_timer *pop_heap_timer(struct heap_tree *p_heap_tree);
+struct heap_timer *del_heap_timer(struct heap_tree *p_heap_tree, uint32_t hole);
 void test_heap_timer();
 
 #endif

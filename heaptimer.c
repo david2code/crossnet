@@ -16,8 +16,6 @@ int init_heap_timer(struct heap_tree *p_heap_tree, int size)
         p_heap_tree->array[i] = NULL;
     }
 
-    pthread_mutex_init(&p_heap_tree->mutex, NULL);
-
     return 0;
 }
 

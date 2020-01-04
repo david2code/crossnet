@@ -404,6 +404,11 @@ void backend_socket_exit_cb(void *v)
         return;
     }
 
+    if (sk->timer.hole != BACKEND_HEAP_INVALID_HOLE) {
+        del_heap_timer(&p_table->heap, sk->timer.hole);
+        sk->timer.hole = BACKEND_HEAP_INVALID_HOLE;
+    }
+
     delete_event(p_table->epfd, sk->fd, sk, EPOLLIN | EPOLLOUT);
 
     close(sk->fd);
@@ -489,6 +494,17 @@ void backend_event_connect(struct backend_work_thread_table *p_table, struct bac
     p_node->exit_cb         = backend_socket_exit_cb;
     p_node->del_cb          = backend_socket_del_cb;
 
+    p_node->timer.hole      = BACKEND_HEAP_INVALID_HOLE;
+    p_node->timer.timeout   = time(NULL) + 10;
+    int ret = add_heap_timer(&p_table->heap, &p_node->timer);
+    if (ret != 0) {
+        DBG_PRINTF(DBG_ERROR, "new socket %d seq_id %u add timer failed\n",
+                p_node->seq_id,
+                p_node->fd);
+        backend_sk_raw_del(p_node);
+        return;
+    }
+
     struct list_table *p_list_table = &p_table->list_head[BACKEND_SOCKET_TYPE_READY];
     list_add_fe(&p_node->list_head, &p_list_table->list_head);
     p_list_table->num++;
@@ -496,7 +512,7 @@ void backend_event_connect(struct backend_work_thread_table *p_table, struct bac
     set_none_block(p_node->fd);
     add_event(p_table->epfd, p_node->fd, p_node, EPOLLIN);
 
-    DBG_PRINTF(DBG_NORMAL, "new socket %d seq_id %u success\n",
+    DBG_PRINTF(DBG_WARNING, "new socket %d seq_id %u success\n",
             p_node->seq_id,
             p_node->fd);
 }
@@ -657,6 +673,20 @@ void *backend_thread_socket_process(void *arg)
             }
         }
 
+
+        struct heap_timer *p_top_timer = top_heap_timer(&p_table->heap);
+        if (p_top_timer) {
+            if (p_top_timer->timeout < time(NULL)) {
+                //timeout
+                struct backend_sk_node *p_entry = list_entry(p_top_timer, struct backend_sk_node, timer);
+                DBG_PRINTF(DBG_ERROR, "%u:%d, type:%d timeout:%u\n",
+                        p_entry->seq_id,
+                        p_entry->fd,
+                        p_entry->type,
+                        p_entry->timer.timeout);
+                p_entry->exit_cb(p_entry);
+            }
+        }
 #if 0
         time_t now = time(NULL);
         if ((now - last_time) > LT_MANAGE_SOCKET_CHECK_PERIOD_SECONDS)
@@ -678,7 +708,7 @@ void *backend_thread_socket_process(void *arg)
 
 int backend_thread_pool_init()
 {
-    int i, res;
+    int i, ret;
 
     p_backend_work_thread_table_array = (struct backend_work_thread_table *)malloc(sizeof(struct backend_work_thread_table) * BACKEND_WORK_THREAD_NUM);
     if (p_backend_work_thread_table_array == NULL)
@@ -696,13 +726,19 @@ int backend_thread_pool_init()
         }
 
         DHASH_INIT(p_backend_work_thread_table_array, &p_backend_work_thread_table_array[i].hash, BACKEND_THREAD_HASH_SIZE);
-        notify_table_init(&p_backend_work_thread_table_array[i].notify, "my_notify", 50000);
+        notify_table_init(&p_backend_work_thread_table_array[i].notify, "backend_thread_notify", 50000);
 
         backend_thread_event_init(&p_backend_work_thread_table_array[i]);
 
-        res = pthread_create(&p_backend_work_thread_table_array[i].thread_id, NULL, backend_thread_socket_process, (void *)&p_backend_work_thread_table_array[i]);
+        ret = init_heap_timer(&p_backend_work_thread_table_array[i].heap, BACKEND_HEAP_MAX_SIZE);
+        if (ret != 0) {
+            perror("heap timer create failed!");
+            exit(EXIT_FAILURE);
+        }
 
-        if (res != 0) {
+        ret = pthread_create(&p_backend_work_thread_table_array[i].thread_id, NULL, backend_thread_socket_process, (void *)&p_backend_work_thread_table_array[i]);
+
+        if (ret != 0) {
             perror("Thread creation failed!");
             exit(EXIT_FAILURE);
         }
@@ -797,7 +833,6 @@ void backend_socket_handle_accpet_cb()
     g_debug_backend_id = p_node->seq_id;
     uint32_t ip = ntohl(client_addr.sin_addr.s_addr);
 
-    p_node->mac_hash_node.prev = p_node->mac_hash_node.next = NULL;
     p_node->id_hash_node.prev = p_node->id_hash_node.next = NULL;
     p_node->fd              = new_socket;
     p_node->ip              = ip;

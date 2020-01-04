@@ -134,6 +134,7 @@ int init()
 
     return 0;
 }
+
 int main(int argc, char **argv)
 {
     bool daemon = false;
