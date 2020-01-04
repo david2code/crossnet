@@ -391,7 +391,7 @@ void frontend_socket_del_cb(void *v)
     free_frontend_socket_node(sk);
 }
 
-void frontend_event_add_new_socket_node(struct frontend_work_thread_table *p_table, struct frontend_sk_node *p_node)
+void frontend_event_connect(struct frontend_work_thread_table *p_table, struct frontend_sk_node *p_node)
 {
     if (-1 == DHASH_INSERT(p_frontend_work_thread_table_array, &p_table->hash, p_node)) {
         DBG_PRINTF(DBG_ERROR, "new socket %u:%d exist!\n",
@@ -470,12 +470,8 @@ void frontend_event_read_cb(void *v)
                     //manage_unuse_notify_free_socket_node(p_my_table, p_entry);
                     break;
 
-                case PIPE_NOTIFY_TYPE_SOCKET_NODE:
-                    frontend_event_add_new_socket_node(p_my_table, (struct frontend_sk_node *)p_entry->p_node);
-                    free_notify_node(p_entry);
-                    break;
-
-                case PIPE_NOTIFY_TYPE_PAIRS_INFO:
+                case PIPE_NOTIFY_TYPE_CONNECT:
+                    frontend_event_connect(p_my_table, (struct frontend_sk_node *)p_entry->p_node);
                     free_notify_node(p_entry);
                     break;
 
@@ -660,7 +656,7 @@ int frontend_notify_new_socket(struct frontend_sk_node *p_node)
     if (p_notify_node == NULL) {
         return -1;
     }
-    p_notify_node->type = PIPE_NOTIFY_TYPE_SOCKET_NODE;
+    p_notify_node->type = PIPE_NOTIFY_TYPE_CONNECT;
     p_notify_node->p_node = p_node;
 
     int index = p_node->seq_id % FRONTEND_WORK_THREAD_NUM;

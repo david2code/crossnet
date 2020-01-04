@@ -38,54 +38,6 @@ void display_g_notify_buff_table()
     display_buff_table(&g_notify_buff_table);
 }
 
-#if 0
-int lt_nofity_make_cmd_to_manage(uint32_t src_id, uint32_t dest_id, enum pipe_notify_type type)
-{
-    struct notify_node *p_nofity_node = malloc_notify_node();
-    if (p_nofity_node == NULL)
-    {
-        return -1;
-    }
-    p_nofity_node->type = type;
-    p_nofity_node->src_id = src_id;
-    p_nofity_node->dst_id = dest_id;
-
-    manage_unuse_notify(p_nofity_node, 1);
-    return 0;
-}
-
-int lt_nofity_make_cmd_to_front(uint32_t src_id, uint32_t dest_id, enum pipe_notify_type type)
-{
-    struct notify_node *p_nofity_node = malloc_notify_node();
-    if (p_nofity_node == NULL)
-    {
-        return -1;
-    }
-    p_nofity_node->type = type;
-    p_nofity_node->src_id = src_id;
-    p_nofity_node->dst_id = dest_id;
-
-    front_notify(p_nofity_node, dest_id, 1);
-    return 0;
-}
-int lt_nofity_make_cmd_to_user(uint32_t src_id, uint32_t dest_id, struct front_socket_stat *p_stat, enum pipe_notify_type type)
-{
-    struct notify_node *p_nofity_node = malloc_notify_node();
-    if (p_nofity_node == NULL)
-    {
-        return -1;
-    }
-    p_nofity_node->type = type;
-    p_nofity_node->src_id = src_id;
-    p_nofity_node->dst_id = dest_id;
-    memcpy(p_nofity_node->buf, p_stat, sizeof(struct front_socket_stat));
-
-    user_notify(p_nofity_node, 1);
-    return 0;
-}
-
-#endif
-
 #endif
 
 #if 2

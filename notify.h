@@ -15,8 +15,7 @@ struct notify_table {
 };
 
 enum pipe_notify_type {
-    PIPE_NOTIFY_TYPE_SOCKET_NODE,
-    PIPE_NOTIFY_TYPE_PAIRS_INFO,
+    PIPE_NOTIFY_TYPE_CONNECT,
     PIPE_NOTIFY_TYPE_SEND,
     PIPE_NOTIFY_TYPE_FREE,
     PIPE_NOTIFY_TYPE_MAX
@@ -35,17 +34,6 @@ struct notify_node {
     uint8_t                 buf[MAX_BUFF_SIZE];    
 };
 
-enum socket_nofity_type {
-    SOCKET_NOTIFY_TYPE_FREE,
-    SOCKET_NOTIFY_TYPE_FRONT,
-    SOCKET_NOTIFY_TYPE_MANAGE,
-    SOCKET_NOTIFY_TYPE_USER,
-    SOCKET_NOTIFY_TYPE_MAX
-};
-
-int lt_nofity_make_cmd_to_manage(uint32_t src_id, uint32_t dest_id, enum pipe_notify_type type);
-int lt_nofity_make_cmd_to_front(uint32_t src_id, uint32_t dest_id, enum pipe_notify_type type);
-//int lt_nofity_make_cmd_to_user(uint32_t src_id, uint32_t dest_id, struct front_socket_stat *p_stat, enum pipe_notify_type type);
 void display_g_notify_buff_table();
 
 void notify_buf_table_init();

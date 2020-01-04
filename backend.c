@@ -468,7 +468,7 @@ void backend_socket_del_cb(void *v)
     free_backend_socket_node(sk);
 }
 
-void backend_event_socket_node(struct backend_work_thread_table *p_table, struct backend_sk_node *p_node)
+void backend_event_connect(struct backend_work_thread_table *p_table, struct backend_sk_node *p_node)
 {
     if (-1 == DHASH_INSERT(p_backend_work_thread_table_array, &p_table->hash, p_node)) {
         DBG_PRINTF(DBG_ERROR, "new socket %u:%d exist!\n",
@@ -507,20 +507,19 @@ void backend_event_send(struct backend_work_thread_table *p_table, struct notify
     if (sk == NULL) {
         DBG_PRINTF(DBG_NORMAL, "src_id %u -> dst_id %u unfound!\n",
             p_notify_node->src_id,
-            p_notify_node->dst_id); 
+            p_notify_node->dst_id);
         free_notify_node(p_notify_node);
         //todo notify peer id not found
-        
+
         return;
     }
 
     DBG_PRINTF(DBG_NORMAL, "src_id %u -> dst_id %u send!\n",
         p_notify_node->src_id,
-        p_notify_node->dst_id); 
-        
+        p_notify_node->dst_id);
+
     list_add_tail(&p_notify_node->list_head, &sk->send_list);
     sk->write_cb(sk);
-    
 }
 
 void backend_event_read_cb(void *v)
@@ -548,13 +547,8 @@ void backend_event_read_cb(void *v)
                     //manage_unuse_notify_free_socket_node(p_my_table, p_entry);
                     break;
 
-                case PIPE_NOTIFY_TYPE_SOCKET_NODE:
-                    backend_event_socket_node(p_my_table, (struct backend_sk_node *)p_entry->p_node);
-                    free_notify_node(p_entry);
-                    break;
-
-                case PIPE_NOTIFY_TYPE_PAIRS_INFO:
-                    //manage_unuse_do_notify_3pairs_info(p_my_table, p_entry);
+                case PIPE_NOTIFY_TYPE_CONNECT:
+                    backend_event_connect(p_my_table, (struct backend_sk_node *)p_entry->p_node);
                     free_notify_node(p_entry);
                     break;
 
@@ -739,7 +733,7 @@ int backend_notify_new_socket(struct backend_sk_node *p_node)
     if (p_notify_node == NULL) {
         return -1;
     }
-    p_notify_node->type = PIPE_NOTIFY_TYPE_SOCKET_NODE;
+    p_notify_node->type = PIPE_NOTIFY_TYPE_CONNECT;
     p_notify_node->p_node = p_node;
 
     int index = p_node->seq_id % BACKEND_WORK_THREAD_NUM;
