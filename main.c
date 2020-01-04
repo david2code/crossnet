@@ -19,6 +19,7 @@
 #include "frontend.h"
 #include "backend.h"
 #include "unique_id.h"
+#include "heaptimer.h"
 
 int g_main_running = 1;
 int g_main_debug = DBG_WARNING;
@@ -138,6 +139,8 @@ int main(int argc, char **argv)
     bool daemon = false;
     char *config = "main.conf";
 
+    //test_heap_timer();
+    //return 0;
     int c, option_index;
     static struct option long_options[] = {
         {"daemon",  no_argument,        NULL,   'd'},
