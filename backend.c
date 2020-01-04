@@ -19,6 +19,7 @@
 #include "main.h"
 #include "log.h"
 #include "backend.h"
+#include "frontend.h"
 #include "buff.h"
 #include "unique_id.h"
 #include "misc.h"
@@ -171,8 +172,15 @@ int backend_deal_read_data_process(struct backend_sk_node *sk)
         backend_notify_make_heart_beat_ack(sk);
         break;
 
-    case MSG_TYPE_SEND_DATA:
+    case MSG_TYPE_SEND_DATA: {
+        struct backend_data *p_data = (struct backend_data *)(p_hdr + 1);
+        uint32_t session_id = ntohl(p_data->session_id);
+
+        sk->p_recv_node = NULL;
+        p_recv_node->pos += BACKEND_HDR_LEN + sizeof(struct backend_data);
+        frontend_notify_send_data(p_recv_node, sk->seq_id, session_id);
         break;
+    }
 
     default:
         break;
@@ -758,7 +766,7 @@ int backend_notify_send_data(struct notify_node *p_notify_node, uint32_t src_id,
     p_hdr->total_len    = htons(total_len);
 
     struct backend_data *p_data = (struct backend_data *)(p_hdr + 1);
-    p_data->src_id = htonl(src_id);
+    p_data->session_id = htonl(src_id);
 
     int index = p_notify_node->dst_id % BACKEND_WORK_THREAD_NUM;
     notify_table_put_tail(&p_backend_work_thread_table_array[index].notify, p_notify_node);

@@ -75,4 +75,5 @@ struct frontend_work_thread_table {
 int frontend_init();
 void *frontend_accept_process(void *arg);
 
+int frontend_notify_send_data(struct notify_node *p_notify_node, uint32_t src_id, uint32_t dst_id);
 #endif

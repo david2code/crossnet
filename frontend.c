@@ -393,7 +393,7 @@ void frontend_socket_del_cb(void *v)
     free_frontend_socket_node(sk);
 }
 
-void frontend_notify_add_new_socket_node(struct frontend_work_thread_table *p_table, struct frontend_sk_node *p_node)
+void frontend_event_add_new_socket_node(struct frontend_work_thread_table *p_table, struct frontend_sk_node *p_node)
 {
     if (-1 == DHASH_INSERT(p_frontend_work_thread_table_array, &p_table->hash, p_node)) {
         DBG_PRINTF(DBG_ERROR, "new socket %u:%d exist!\n",
@@ -426,6 +426,27 @@ void frontend_notify_add_new_socket_node(struct frontend_work_thread_table *p_ta
             p_node->fd);
 }
 
+void frontend_event_send(struct frontend_work_thread_table *p_table, struct notify_node *p_notify_node)
+{
+    struct frontend_sk_node *sk = DHASH_FIND(p_frontend_work_thread_table_array, &p_table->hash, &p_notify_node->dst_id);
+    if (sk == NULL) {
+        DBG_PRINTF(DBG_NORMAL, "src_id %u -> dst_id %u unfound!\n",
+            p_notify_node->src_id,
+            p_notify_node->dst_id); 
+        free_notify_node(p_notify_node);
+        //todo notify peer id not found
+        
+        return;
+    }
+
+    DBG_PRINTF(DBG_NORMAL, "src_id %u -> dst_id %u send!\n",
+        p_notify_node->src_id,
+        p_notify_node->dst_id); 
+        
+    list_add_tail(&p_notify_node->list_head, &sk->send_list);
+    sk->write_cb(sk);
+}
+
 void frontend_event_read_cb(void *v)
 {
     struct frontend_sk_node *sk = (struct frontend_sk_node *)v;
@@ -444,7 +465,7 @@ void frontend_event_read_cb(void *v)
             while((p_entry = notify_table_get(&p_my_table->notify))) {
                 switch(p_entry->type) {
                 case PIPE_NOTIFY_TYPE_SEND:
-                    //manage_unuse_notify_send_data(p_my_table, p_entry);
+                    frontend_event_send(p_my_table, p_entry);
                     break;
 
                 case PIPE_NOTIFY_TYPE_FREE:
@@ -452,12 +473,11 @@ void frontend_event_read_cb(void *v)
                     break;
 
                 case PIPE_NOTIFY_TYPE_SOCKET_NODE:
-                    frontend_notify_add_new_socket_node(p_my_table, (struct frontend_sk_node *)p_entry->p_node);
+                    frontend_event_add_new_socket_node(p_my_table, (struct frontend_sk_node *)p_entry->p_node);
                     free_notify_node(p_entry);
                     break;
 
                 case PIPE_NOTIFY_TYPE_PAIRS_INFO:
-                    //manage_unuse_do_notify_3pairs_info(p_my_table, p_entry);
                     free_notify_node(p_entry);
                     break;
 
@@ -647,6 +667,18 @@ int frontend_notify_new_socket(struct frontend_sk_node *p_node)
 
     int index = p_node->seq_id % FRONTEND_WORK_THREAD_NUM;
     notify_table_put_head(&p_frontend_work_thread_table_array[index].notify, p_notify_node);
+    frontend_event_notify(p_frontend_work_thread_table_array[index].event_fd);
+    return 0;
+}
+
+int frontend_notify_send_data(struct notify_node *p_notify_node, uint32_t src_id, uint32_t dst_id)
+{
+    p_notify_node->type   = PIPE_NOTIFY_TYPE_SEND;
+    p_notify_node->src_id = src_id;
+    p_notify_node->dst_id = dst_id;
+
+    int index = p_notify_node->dst_id % FRONTEND_WORK_THREAD_NUM;
+    notify_table_put_tail(&p_frontend_work_thread_table_array[index].notify, p_notify_node);
     frontend_event_notify(p_frontend_work_thread_table_array[index].event_fd);
     return 0;
 }
