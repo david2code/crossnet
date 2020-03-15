@@ -6,7 +6,7 @@
 
 #define USER_NUM      100
 
-#define FRONTEND_PORT   80
+#define FRONTEND_PORT   81
 //#define FRONTEND_PORT   443
 #define FRONTEND_WORK_THREAD_NUM    4
 
@@ -22,9 +22,9 @@
 
 enum socket_status {
     SOCKET_STATUS_NEW = 0,
-    SOCKET_STATUS_EXIT_AFTER_SEND,/* socket需要被关闭 */
+    SOCKET_STATUS_EXIT_AFTER_SEND,
     SOCKET_STATUS_UNUSE_AFTER_SEND,
-    SOCKET_STATUS_DEL,/* socket需要被删除 */
+    SOCKET_STATUS_DEL,
     SOCKET_STATUS_MAX
 };
 
