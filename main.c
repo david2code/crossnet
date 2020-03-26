@@ -20,6 +20,7 @@
 #include "backend.h"
 #include "unique_id.h"
 #include "heaptimer.h"
+#include "dc_mysql.h"
 
 int g_main_running = 1;
 int g_main_debug = DBG_NORMAL;
@@ -129,6 +130,9 @@ int init()
     unique_id_init();
     notify_buf_table_init();
 
+    user_table_init();
+    dc_mysql_init();
+
     frontend_init();
     backend_init();
 
@@ -197,6 +201,8 @@ int main(int argc, char **argv)
     pthread_t frontend_thread;
     pthread_t backend_thread;
     pthread_t timer_thread;
+    pthread_t user_socket_thread;
+    pthread_t mysql_thread;
 
     sigset_t signal_mask;
     sigemptyset(&signal_mask);
@@ -224,6 +230,18 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
+    res = pthread_create(&user_socket_thread, NULL, user_socket_process, NULL);
+    if (res != 0) {
+        perror("Thread creation failed!");
+        exit(EXIT_FAILURE);
+    }
+
+    res = pthread_create(&mysql_thread, NULL, mysql_process, NULL);
+    if (res != 0) {
+        perror("Thread creation failed!");
+        exit(EXIT_FAILURE);
+    }
+
     res = pthread_join(frontend_thread, NULL);
     if (res != 0) {
         perror("Thread join failed!");
@@ -237,6 +255,18 @@ int main(int argc, char **argv)
     }
 
     res = pthread_join(timer_thread, NULL);
+    if (res != 0) {
+        perror("Thread join failed!");
+        exit(EXIT_FAILURE);
+    }
+
+    res = pthread_join(user_socket_thread, NULL);
+    if (res != 0) {
+        perror("Thread join failed!");
+        exit(EXIT_FAILURE);
+    }
+
+    res = pthread_join(mysql_thread, NULL);
     if (res != 0) {
         perror("Thread join failed!");
         exit(EXIT_FAILURE);

@@ -12,7 +12,7 @@ endif
 THIS_VERSION=\"v$(VERSION)-$(GIT_COMMIT_ID)-$(MAKE_TIME)\"
 CFLAGS = -DVERSION=$(THIS_VERSION)
 
-COPTIONS = -fPIC -Wall -rdynamic -O0 -g
+COPTIONS = -fPIC -Wall -rdynamic -O2 -g
 
 CINCDIRS = -I/usr/include/mysql
 LINKLIBS = -L/lib64/mysql -L/usr/local/lib -lmysqlclient -lpthread -lz -lcrypto -ljson-c -lcurl -liconv

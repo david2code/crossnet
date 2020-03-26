@@ -411,7 +411,8 @@ tlv_node_t *tlv_node_fill_uint16_t(tlv_node_t *p_tlv, uint8_t type, uint16_t val
 {    
     p_tlv->type = type;
     p_tlv->length = htons(sizeof(value));
-    *((uint16_t *)p_tlv->value) = htons(value);
+    uint16_t *p = (uint16_t *)p_tlv->value;
+    *p = htons(value);
 
     return (tlv_node_t *)(p_tlv->value + sizeof(value));
 }
@@ -420,7 +421,8 @@ tlv_node_t *tlv_node_fill_uint32_t(tlv_node_t *p_tlv, uint8_t type, uint32_t val
 {    
     p_tlv->type = type;
     p_tlv->length = htons(sizeof(value));
-    *((uint32_t *)p_tlv->value) = htonl(value);
+    uint32_t *p = (uint32_t *)p_tlv->value;
+    *p = htonl(value);
 
     return (tlv_node_t *)(p_tlv->value + sizeof(value));
 }
@@ -429,7 +431,8 @@ tlv_node_t *tlv_node_fill_uint64_t(tlv_node_t *p_tlv, uint8_t type, uint64_t val
 {    
     p_tlv->type = type;
     p_tlv->length = htons(sizeof(value));
-    *((uint64_t *)p_tlv->value) = htonll(value);
+    uint64_t *p = (uint64_t *)p_tlv->value;
+    *p = htonll(value);
 
     return (tlv_node_t *)(p_tlv->value + sizeof(value));
 }
@@ -937,7 +940,7 @@ inline int uint64_t_cmp(uint64_t *a, uint64_t *b)
     return (*a == *b) ? 0: 1;
 }
 
-inline int ngx_cmp(ngx_str_t *a, ngx_str_t *b)
+inline int ngx_cmp(const ngx_str_t *a, const ngx_str_t *b)
 {
     if (a->len == b->len)
         return memcmp(a->data, b->data, a->len);
@@ -1205,4 +1208,13 @@ int code_convert( const char* from_charset,
     }
     iconv_close( cd );
     return 0;
+}
+
+char *date_format(char *buffer, size_t buffer_len, time_t time)
+{
+    struct tm *timeinfo;
+
+    timeinfo = localtime(&time);
+    strftime(buffer, buffer_len, "%Y/%m/%d %H:%M:%S", timeinfo);
+    return buffer;
 }

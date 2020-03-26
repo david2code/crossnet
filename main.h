@@ -13,7 +13,13 @@
 #define BACKEND_PORT   66
 #define BACKEND_WORK_THREAD_NUM    4
 
-#define TABLE_NAME_LEN  50
+#define USER_PORT     (800)
+
+#define TABLE_NAME_LEN     50
+#define USER_NAME_MAX_LEN  64
+#define PASSWORD_MAX_LEN   64
+#define DOMAIN_MAX_LEN     64
+
 #define MAX_BUFF_SIZE            2048
 
 #define SUCCESS    0
