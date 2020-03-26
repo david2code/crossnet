@@ -21,6 +21,8 @@
 #include "unique_id.h"
 #include "heaptimer.h"
 #include "dc_mysql.h"
+#include "user.h"
+#include "domain_map.h"
 
 int g_main_running = 1;
 int g_main_debug = DBG_NORMAL;
@@ -130,6 +132,7 @@ int init()
     unique_id_init();
     notify_buf_table_init();
 
+    domain_map_table_init();
     user_table_init();
     dc_mysql_init();
 
