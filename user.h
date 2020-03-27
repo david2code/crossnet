@@ -3,6 +3,7 @@
 
 #include "main.h"
 #include "hash_table.h"
+#include "domain_map.h"
 
 #define USER_SOCKET_TIMEOUT_MAX_SECONDS       (20)
 #define USER_SOCKET_CHECK_PERIOD_SECONDS      (USER_SOCKET_TIMEOUT_MAX_SECONDS * 5)
@@ -160,10 +161,7 @@ struct user_node {
     ngx_str_t                   ngx_user_name;
 
     char                        password[PASSWORD_MAX_LEN + 1];
-    ngx_str_t                   ngx_password;
-
     char                        domain[DOMAIN_MAX_LEN + 1];
-    ngx_str_t                   ngx_domain;
 
     time_t                      start_time;
     time_t                      end_time;
@@ -211,4 +209,5 @@ void display_g_user_buff_table();
 void display_g_user_socket_buff_table();
 void display_g_user_resp_buff_table();
 
+int user_auth_and_get_domain(struct domain_node *p_domain_node, char *user_name, char *md5, uint32_t salt);
 #endif

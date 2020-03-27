@@ -99,8 +99,12 @@ void domain_map_table_init()
 }
 
 
-int domain_map_insert()
+int domain_map_insert(struct domain_node *p_domain_node)
 {
+    DBG_PRINTF(DBG_WARNING, "domain %s user_id %u backend_id %u, insert success\n",
+            p_domain_node->domain,
+            p_domain_node->user_id,
+            p_domain_node->backend_id);
     return 0;
 }
 #endif

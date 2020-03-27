@@ -21,6 +21,14 @@
 #define BACKEND_HEAP_MAX_SIZE               (BACKEND_SOCKET_MAX_NUM)
 #define BACKEND_HEAP_INVALID_HOLE           (BACKEND_HEAP_MAX_SIZE + 1)
 
+enum sk_status {
+    SK_STATUS_NEW = 0,
+    SK_STATUS_CHALLENGE,
+    SK_STATUS_AUTHED,
+    SK_STATUS_DEL,
+    SK_STATUS_MAX,
+};
+
 struct backend_sk_node {
     struct list_head    list_head;
     struct list_head    id_hash_node;
@@ -51,6 +59,7 @@ struct backend_sk_node {
     uint32_t            delay_ms;
 
     struct heap_timer   timer;
+    uint32_t            salt;
 
     void                (*read_cb)(void *v);
     void                (*write_cb)(void *v);
@@ -84,10 +93,20 @@ struct backend_work_thread_table {
 
 #define BACKEND_MAGIC               0x5a5a
 #define BACKEND_RESERVE_HDR_SIZE    100
+typedef enum{
+    TLV_TYPE_USER_NAME       = 0,
+    TLV_TYPE_PASSWORD        = 1,
+    TLV_TYPE_MD5             = 2,
+    TLV_TYPE_MY_DOMAIN       = 3,
+    TLV_TYPE_HOST            = 4,
+}tlv_type;
 
 enum msg_type {
     MSG_TYPE_HEART_BEAT,
     MSG_TYPE_HEART_BEAT_ACK,
+    MSG_TYPE_CHALLENGE,
+    MSG_TYPE_AUTH,
+    MSG_TYPE_AUTH_ACK,
     MSG_TYPE_SEND_DATA,
     MSG_TYPE_MAX,
 };
@@ -102,6 +121,14 @@ struct backend_hdr {
 
 struct backend_data {
     uint32_t  session_id;
+}__attribute__((packed));
+
+struct challenge_data {
+    uint32_t  salt;
+}__attribute__((packed));
+
+struct auth_ack_data {
+    int  status;
 }__attribute__((packed));
 
 int backend_init();

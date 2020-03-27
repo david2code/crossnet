@@ -24,6 +24,8 @@
 #include "unique_id.h"
 #include "misc.h"
 #include "hash_table.h"
+#include "user.h"
+#include "domain_map.h"
 
 
 struct accept_socket_table g_backend_accept_socket_table;
@@ -160,15 +162,119 @@ int backend_notify_make_heart_beat_ack(struct backend_sk_node *sk)
     return 0;
 }
 
+int backend_notify_make_challenge(struct backend_sk_node *sk)
+{
+    struct notify_node *p_notify_node = sk->p_recv_node;
+    if (p_notify_node == NULL) {
+        return FAIL;
+    }
+    sk->p_recv_node = NULL;
+    p_notify_node->type = PIPE_NOTIFY_TYPE_SEND;
+    p_notify_node->pos  = 0;
+
+    uint16_t total_len = sizeof(struct backend_hdr) + sizeof(struct challenge_data);
+    struct backend_hdr *p_hdr   = (struct backend_hdr *)p_notify_node->buf;
+    struct challenge_data *p_data = (struct challenge_data *)(p_hdr + 1);
+
+    sk->salt     = time(NULL);
+    p_data->salt = htonl(sk->salt);
+
+    p_hdr->magic        = htons(BACKEND_MAGIC);
+    p_hdr->type         = MSG_TYPE_CHALLENGE;
+    p_hdr->total_len    = htons(total_len);
+    p_notify_node->end  = total_len;
+
+    list_add_tail(&p_notify_node->list_head, &sk->send_list);
+    sk->write_cb(sk);
+    return SUCCESS;
+}
+
+int backend_auth_process(struct backend_sk_node *sk)
+{
+    struct notify_node *p_recv_node = sk->p_recv_node;
+    struct backend_hdr *p_hdr = (struct backend_hdr *)(p_recv_node->buf + p_recv_node->pos);
+    tlv_node_t *p_tlv = (tlv_node_t *)(p_hdr + 1);
+    tlv_node_t *p_tlv_end = (tlv_node_t *)(p_recv_node->buf + p_recv_node->end);
+    uint8_t                 type;
+    uint16_t                length;
+    uint8_t                 *value;
+    char                    user_name[USER_NAME_MAX_LEN + 1] = {0};
+    char                    md5[MD5_MAX_LEN + 1] = {0};
+    int ret = SUCCESS;
+
+    while(p_tlv < p_tlv_end) {
+        type    = p_tlv->type;
+        length  = ntohs(p_tlv->length);
+        value   = p_tlv->value;
+
+        DBG_PRINTF(DBG_NORMAL, "pos: %x, tlv type %d, length: %d\n", (uint8_t *)p_tlv - p_recv_node->buf, type, length);
+
+        switch(type) {
+        case TLV_TYPE_USER_NAME:
+            if (length > USER_NAME_MAX_LEN) {
+                ret = FAIL;
+                goto EXIT;
+            } else {
+                memcpy(user_name, value, length);
+                user_name[length] = 0;
+            }
+            break;
+
+        case TLV_TYPE_MD5:
+            if (length != 32) {
+                ret = FAIL;
+                goto EXIT;
+            } else {
+                memcpy(md5, value, length);
+                md5[length] = 0;
+            }
+            break;
+
+        default:
+            DBG_PRINTF(DBG_WARNING, "unknown tlv type %d\n", type);
+            break;
+        }
+
+        p_tlv = (tlv_node_t *)(p_tlv->value + length);
+    }
+
+    struct domain_node domain_node;
+    ret = user_auth_and_get_domain(&domain_node, user_name, md5, sk->salt);
+    if (ret == SUCCESS) {
+        //regist domain map
+        domain_node.backend_id = sk->seq_id;
+        domain_map_insert( &domain_node);
+    }
+
+EXIT:
+    //make regist success resp
+    sk->p_recv_node = NULL;
+
+    p_recv_node->type = PIPE_NOTIFY_TYPE_SEND;
+    p_recv_node->pos  = 0;
+
+    uint16_t                total_len = sizeof(struct backend_hdr) + sizeof(struct auth_ack_data);
+    p_hdr   = (struct backend_hdr *)p_recv_node->buf;
+    struct auth_ack_data *p_data = (struct auth_ack_data *)(p_hdr + 1);
+
+    p_data->status      = htonl(ret);
+    p_hdr->magic        = htons(BACKEND_MAGIC);
+    p_hdr->type         = MSG_TYPE_AUTH_ACK;
+    p_hdr->total_len    = htons(total_len);
+    p_recv_node->end  = total_len;
+
+    list_add_tail(&p_recv_node->list_head, &sk->send_list);
+    sk->write_cb((void *)sk);
+
+    return ret;
+}
+
 int backend_deal_read_data_process(struct backend_sk_node *sk)
 {
     struct notify_node *p_recv_node = sk->p_recv_node;
     struct backend_hdr *p_hdr = (struct backend_hdr *)(p_recv_node->buf + p_recv_node->pos);
 
     switch (p_hdr->type) {
-    case MSG_TYPE_HEART_BEAT:
-        backend_notify_make_heart_beat_ack(sk);
-        break;
 
     case MSG_TYPE_SEND_DATA: {
         struct backend_data *p_data = (struct backend_data *)(p_hdr + 1);
@@ -179,6 +285,20 @@ int backend_deal_read_data_process(struct backend_sk_node *sk)
         frontend_notify_send_data(p_recv_node, sk->seq_id, session_id);
         break;
     }
+
+    case MSG_TYPE_HEART_BEAT:
+        if (sk->status == SK_STATUS_NEW) {
+            int ret = backend_notify_make_challenge(sk);
+            if (ret == SUCCESS)
+                sk->status = SK_STATUS_CHALLENGE;
+        } else {
+            backend_notify_make_heart_beat_ack(sk);
+        }
+        break;
+
+    case MSG_TYPE_AUTH:
+        backend_auth_process(sk);
+        break;
 
     default:
         break;
@@ -486,7 +606,7 @@ void backend_event_connect(struct backend_work_thread_table *p_table, struct bac
     p_node->p_my_table      = p_table;
     p_node->user_block_id   = 0;
     p_node->front_listen_id = 0;
-    p_node->status          = SOCKET_STATUS_NEW;
+    p_node->status          = SK_STATUS_NEW;
     p_node->type            = BACKEND_SOCKET_TYPE_READY;
     p_node->blocked         = 0;
     p_node->read_cb         = backend_socket_read_cb;

@@ -286,13 +286,9 @@ int user_add_account_to_table(
 
     memcpy(p_user_block->password, password, password_len);
     p_user_block->password[password_len] = 0;
-    p_user_block->ngx_password.data = (uint8_t *)p_user_block->password;
-    p_user_block->ngx_password.len = name_len;
 
     memcpy(p_user_block->domain, domain, domain_len);
     p_user_block->domain[domain_len] = 0;
-    p_user_block->ngx_domain.data = (uint8_t *)p_user_block->domain;
-    p_user_block->ngx_domain.len = name_len;
 
 
     p_user_block->time = time;
@@ -370,15 +366,11 @@ int user_mdf_account_in_table(
     if (p_ngx_password->data != NULL) {
         memcpy(p_user_block->password, p_ngx_password->data, p_ngx_password->len);
         p_user_block->password[p_ngx_password->len] = 0;
-        p_user_block->ngx_password.data = (uint8_t *)p_user_block->password;
-        p_user_block->ngx_password.len = p_ngx_password->len;
     }
 
     if (p_ngx_domain->data != NULL) {
         memcpy(p_user_block->domain, p_ngx_domain->data, p_ngx_domain->len);
         p_user_block->domain[p_ngx_domain->len] = 0;
-        p_user_block->ngx_domain.data = (uint8_t *)p_user_block->domain;
-        p_user_block->ngx_domain.len = p_ngx_domain->len;
     }
 
     if (total_flow != UINT64_INVALID_VALUE)
@@ -440,6 +432,72 @@ int user_del_account_in_table(
 USER_DEL_EXIT:
     user_table_unlock();
 
+    return ret;
+}
+
+int user_make_md5(uint8_t *md5, char *password, uint32_t salt)
+{
+#define MD5_STR_BUF_LEN   (PASSWORD_MAX_LEN + 20)
+    uint8_t md5_str_buf[MD5_STR_BUF_LEN + 1] = {0};
+    size_t  md5_str_buf_len;
+
+    md5_str_buf_len = snprintf((char *)md5_str_buf, MD5_STR_BUF_LEN, "%s%u", password, salt);
+    if (NULL == MD5(md5_str_buf, md5_str_buf_len, md5)) {
+        DBG_PRINTF(DBG_ERROR, "md5 error! str: %s, len: %d\n",
+                md5_str_buf,
+                md5_str_buf_len);
+        return FAIL;
+    }
+    return SUCCESS;
+}
+
+int user_auth_and_get_domain(struct domain_node *p_domain_node, char *user_name, char *md5, uint32_t salt)
+{
+    struct user_table *p_table = &g_user_table;
+    int ret = SUCCESS;
+    ngx_str_t ngx_user_name = {
+        .data = (uint8_t *)user_name,
+        .len = strlen(user_name)
+    };
+
+    user_table_lock();
+
+    struct user_node *p_user_block = DHASH_FIND(g_user_table, &p_table->hash, &ngx_user_name);
+
+    if (NULL == p_user_block) {
+        DBG_PRINTF(DBG_ERROR, "user:[%s] not found\n", user_name);
+        ret = FAIL;
+        goto EXIT;
+    }
+
+    if (p_user_block->del_flag == 1) {
+        DBG_PRINTF(DBG_ERROR, "user:[%s] del already\n", p_user_block->user_name);
+        ret = FAIL;
+        goto EXIT;
+    }
+
+    uint8_t check_md5[32] = {0};
+    ret = user_make_md5(check_md5, p_user_block->password, salt);
+    if (ret == FAIL) {
+        goto EXIT;
+    }
+
+    if (memcmp(md5, check_md5, 32) == 0) {
+        strncpy(p_domain_node->domain, p_user_block->domain, DOMAIN_MAX_LEN);
+        p_domain_node->domain[DOMAIN_MAX_LEN] = 0;
+        p_domain_node->ngx_domain.data = (uint8_t *)p_domain_node->domain;
+        p_domain_node->ngx_domain.len = strlen(p_domain_node->domain);
+
+        p_domain_node->user_id = p_user_block->user_id;
+    } else {
+        DBG_PRINTF(DBG_ERROR, "user:[%s] md5 unmatch\n", p_user_block->user_name);
+        ret = FAIL;
+        goto EXIT;
+    }
+
+
+EXIT:
+    user_table_unlock();
     return ret;
 }
 

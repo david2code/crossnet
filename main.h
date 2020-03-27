@@ -19,6 +19,7 @@
 #define USER_NAME_MAX_LEN  64
 #define PASSWORD_MAX_LEN   64
 #define DOMAIN_MAX_LEN     64
+#define MD5_MAX_LEN        32
 
 #define MAX_BUFF_SIZE            2048
 

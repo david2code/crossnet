@@ -28,4 +28,5 @@ struct domain_map_table {
 };
 
 void domain_map_table_init();
+int domain_map_insert(struct domain_node *p_domain_node);
 #endif
