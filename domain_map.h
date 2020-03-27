@@ -29,4 +29,9 @@ struct domain_map_table {
 
 void domain_map_table_init();
 int domain_map_insert(struct domain_node *p_domain_node);
+int domain_map_delete(ngx_str_t *p_ngx_domain);
+int domain_map_query(struct domain_node *p_domain_node, ngx_str_t *p_ngx_domain);
+void display_g_domain_buff_table();
+void display_g_domain_map_table();
+
 #endif

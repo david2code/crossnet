@@ -86,6 +86,8 @@ void set_g_main_debug(int argc, void *argv);
 struct debug_cb g_debug_cb[] = {
     DBG_CB_INIT(display_g_user_table),
     DBG_CB_INIT(display_g_user_buff_table),
+    DBG_CB_INIT(display_g_domain_buff_table),
+    DBG_CB_INIT(display_g_domain_map_table),
     DBG_CB_INIT(set_g_main_debug)
 };
 

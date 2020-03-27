@@ -14,6 +14,7 @@ usage:
 
     display
         curl "http://127.0.0.1:800/debug?display_g_user_table"
+        curl "http://127.0.0.1:800/debug?display_g_domain_map_table"
 
     add_account
         curl "http://127.0.0.1:800/add_account?user_name=xx&password=yy&domain=www.david.com&end_time=1593399542&total_flow=200000"

@@ -52,7 +52,6 @@ inline void free_domain_node(struct domain_node *p_node)
     buff_table_free_node(&g_domain_buf_table, &p_node->list_head);
 }
 
-
 void display_g_domain_buff_table()
 {
     display_buff_table(&g_domain_buf_table);
@@ -64,7 +63,7 @@ void display_g_domain_buff_table()
 
 struct domain_map_table g_domain_map_table;
 
-DHASH_GENERATE(g_domain_map_table, user_node, hash_node, ngx_user_name, ngx_str_t, ngx_hash, ngx_cmp);
+DHASH_GENERATE(g_domain_map_table, domain_node, hash_node, ngx_domain, ngx_str_t, ngx_hash, ngx_cmp);
 
 inline void domain_map_rdlock()
 {
@@ -101,10 +100,128 @@ void domain_map_table_init()
 
 int domain_map_insert(struct domain_node *p_domain_node)
 {
+    struct domain_map_table *p_table = &g_domain_map_table;
+    int ret = SUCCESS;
+
+    domain_map_wrlock();
+
+    struct domain_node *p_entry = DHASH_FIND(g_domain_map_table, &p_table->hash, &p_domain_node->ngx_domain);
+    if (p_entry) {
+        //TODO force quit
+
+        //domain conflict
+        if (p_entry->user_id != p_domain_node->user_id) {
+            p_entry->user_id = p_domain_node->user_id;
+        }
+        p_entry->backend_id = p_domain_node->backend_id;
+
+        goto EXIT;
+    }
+
+    p_entry = malloc_domain_node();
+    if (p_entry == NULL) {
+        ret = FAIL;
+        goto EXIT;
+    }
+
+    strncpy(p_entry->domain, p_domain_node->domain, DOMAIN_MAX_LEN);
+    p_entry->domain[DOMAIN_MAX_LEN] = 0;
+    p_entry->ngx_domain.data = (uint8_t *)p_entry->domain;
+    p_entry->ngx_domain.len = strlen(p_entry->domain);
+
+    p_entry->user_id = p_domain_node->user_id;
+    p_entry->backend_id = p_domain_node->backend_id;
+
+    if (-1 == DHASH_INSERT(g_domain_map_table, &p_table->hash, p_entry)) {
+        DBG_PRINTF(DBG_ERROR, "add new domain node[%s], failed add hash failed\n", p_entry->domain);
+        free_domain_node(p_entry);
+        ret = FAIL;
+        goto EXIT;
+    }
+
+    list_add_fe(&p_entry->list_head, &p_table->list.list_head);
+    p_table->list.num++;
+
+EXIT:
+    domain_map_unlock();
+
     DBG_PRINTF(DBG_WARNING, "domain %s user_id %u backend_id %u, insert success\n",
             p_domain_node->domain,
             p_domain_node->user_id,
             p_domain_node->backend_id);
-    return 0;
+    return ret;
 }
+
+int domain_map_delete(ngx_str_t *p_ngx_domain)
+{
+    struct domain_map_table *p_table = &g_domain_map_table;
+    int ret = SUCCESS;
+
+    domain_map_wrlock();
+
+    struct domain_node *p_entry = DHASH_FIND(g_domain_map_table, &p_table->hash, p_ngx_domain);
+    if (p_entry) {
+        list_del(&p_entry->hash_node);
+        list_del(&p_entry->list_head);
+        p_table->list.num--;
+
+        DBG_PRINTF(DBG_WARNING, "domain %s user_id %u backend_id %u, del success\n",
+                p_entry->domain,
+                p_entry->user_id,
+                p_entry->backend_id);
+
+        free_domain_node(p_entry);
+    } else {
+        ret = FAIL;
+    }
+
+    domain_map_unlock();
+
+    return ret;
+}
+
+int domain_map_query(struct domain_node *p_domain_node, ngx_str_t *p_ngx_domain)
+{
+    struct domain_map_table *p_table = &g_domain_map_table;
+    int ret = SUCCESS;
+
+    domain_map_rdlock();
+
+    struct domain_node *p_entry = DHASH_FIND(g_domain_map_table, &p_table->hash, p_ngx_domain);
+    if (p_entry) {
+        memcpy(p_domain_node, p_entry, sizeof(struct domain_node));
+    } else {
+        DBG_PRINTF(DBG_WARNING, "domain %s not found\n", p_domain_node->domain);
+        ret = FAIL;
+    }
+
+    domain_map_unlock();
+
+    return ret;
+}
+
+void display_g_domain_map_table()
+{
+    struct domain_map_table *p_table = &g_domain_map_table;
+    struct list_head            *p_list = NULL;
+    struct list_table           *p_list_table = &p_table->list;
+
+    domain_map_wrlock();
+
+    DBG_RAW_PRINTF("\n%s, %d, num: %hu, display start\n", __FUNCTION__, __LINE__, p_list_table->num);
+    list_for_each(p_list, &p_list_table->list_head) {
+        struct domain_node *p_entry = list_entry(p_list, struct domain_node, list_head);
+
+        DBG_RAW_PRINTF(" user_id:%5u,backend_id:%8u,domain:%20s\n",
+                p_entry->user_id,
+                p_entry->backend_id,
+                p_entry->domain
+                );
+    }
+
+    domain_map_unlock();
+
+    DBG_RAW_PRINTF("\n%s, %d, display end\n", __FUNCTION__, __LINE__);
+}
+
 #endif
