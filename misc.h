@@ -198,6 +198,7 @@ inline int uint16_t_cmp(uint16_t *a, uint16_t *b);
 inline int uint32_t_cmp(uint32_t *a, uint32_t *b);
 inline int uint64_t_cmp(uint64_t *a, uint64_t *b);
 inline int ngx_cmp(const ngx_str_t *a, const ngx_str_t *b);
+inline int ngx_casecmp(const ngx_str_t *a, const ngx_str_t *b);
 inline uint32_t ngx_hash(ngx_str_t *key);
 
 char *ngx_print(char *buf, int len, ngx_str_t *p_ngx_str);

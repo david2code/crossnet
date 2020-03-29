@@ -14,40 +14,63 @@
 #define FRONTEND_THREAD_EPOLL_MAX_EVENTS  (FRONTEND_ACCEPT_EPOLL_MAX_EVENTS / FRONTEND_WORK_THREAD_NUM)
 #define FRONTEND_THREAD_LISTEN_BACKLOG  (FRONTEND_ACCEPT_LISTEN_BACKLOG / FRONTEND_WORK_THREAD_NUM)
 
+enum http_state{
+    HTTP_STATE_INIT,
+    HTTP_STATE_REQUEST,
+    HTTP_STATE_RELAY,
+};
+
+struct http_parse_block {
+    int                     start;
+    int                     end;
+    int                     pos;
+    
+    ngx_str_t               request_line;
+    ngx_str_t               user_agent;
+    ngx_str_t               host;
+    
+    unsigned int            connect_method;
+    uint64_t                content_length;
+
+    uint8_t                 headers_finish;
+    uint8_t                 content_finish;
+    
+    struct request_s        request;
+};
+
+
 struct frontend_sk_node {
-    struct list_head    list_head;
-    struct list_head    mac_hash_node;
-    struct list_head    id_hash_node;
+    struct list_head            list_head;
+    struct list_head            id_hash_node;
 
-    int                 fd;
-    uint32_t            seq_id;
+    int                         fd;
+    uint32_t                    seq_id;
 
-    uint32_t            ip;
-    uint16_t            port;
+    uint32_t                    ip;
+    uint16_t                    port;
 
-    uint32_t            user_block_id;
-    uint32_t            front_listen_id;
+    uint32_t                    user_block_id;
+    uint32_t                    front_listen_id;
 
-    void                *p_my_table;
+    void                        *p_my_table;
 
-    struct notify_node  *p_recv_node;
-    struct list_head    send_list;
+    struct notify_node          *p_recv_node;
+    struct list_head            send_list;
 
-    time_t              last_active;
+    time_t                      last_active;
 
-    uint8_t             status;
+    uint8_t                     status;
 
-    uint8_t             type;
-    uint8_t             blocked;
+    uint8_t                     type;
+    uint8_t                     blocked;
 
-    uint32_t            alive_cnt;
-    uint32_t            quality;
-    uint32_t            delay_ms;
+    enum http_state             state;
+    struct http_parse_block     parse_block;
 
-    void                (*read_cb)(void *v);
-    void                (*write_cb)(void *v);
-    void                (*exit_cb)(void *v);
-    void                (*del_cb)(void *v);
+    void                        (*read_cb)(void *v);
+    void                        (*write_cb)(void *v);
+    void                        (*exit_cb)(void *v);
+    void                        (*del_cb)(void *v);
 };
 
 enum {

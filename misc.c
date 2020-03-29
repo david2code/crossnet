@@ -446,9 +446,7 @@ tlv_node_t *tlv_node_fill_with_length(tlv_node_t *p_tlv, uint8_t type, uint8_t *
     return (tlv_node_t *)(p_tlv->value + length);
 }
 
-
-uint8_t *
-ngx_strnstr(uint8_t *s1, char *s2, size_t len)
+uint8_t * ngx_strnstr(uint8_t *s1, char *s2, size_t len)
 {
     uint8_t  c1, c2;
     size_t  n;
@@ -488,8 +486,7 @@ ngx_strnstr(uint8_t *s1, char *s2, size_t len)
  * instead of the uint8_t's, because they are slightly faster.
  */
 
-ngx_int_t
-ngx_strcasecmp(uint8_t *s1, uint8_t *s2)
+ngx_int_t ngx_strcasecmp(uint8_t *s1, uint8_t *s2)
 {
     ngx_uint_t  c1, c2;
 
@@ -513,9 +510,7 @@ ngx_strcasecmp(uint8_t *s1, uint8_t *s2)
     }
 }
 
-
-ngx_int_t
-ngx_strncasecmp(uint8_t *s1, uint8_t *s2, size_t n)
+ngx_int_t ngx_strncasecmp(uint8_t *s1, uint8_t *s2, size_t n)
 {
     ngx_uint_t  c1, c2;
 
@@ -541,6 +536,7 @@ ngx_strncasecmp(uint8_t *s1, uint8_t *s2, size_t n)
 
     return 0;
 }
+
 #if 1
 int char2value (char ch)
 {    
@@ -944,6 +940,14 @@ inline int ngx_cmp(const ngx_str_t *a, const ngx_str_t *b)
 {
     if (a->len == b->len)
         return memcmp(a->data, b->data, a->len);
+    else
+        return (a->len - b->len);
+}
+
+inline int ngx_casecmp(const ngx_str_t *a, const ngx_str_t *b)
+{
+    if (a->len == b->len)
+        return ngx_strncasecmp(a->data, b->data, a->len);
     else
         return (a->len - b->len);
 }
