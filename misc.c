@@ -1046,7 +1046,7 @@ ssize_t chomp (char *buffer, size_t length)
     return chars;
 }
 
-ssize_t chomp_ngx_str (ngx_str_t *ngx_str)
+ssize_t chomp_ngx_str(ngx_str_t *ngx_str)
 {
     size_t chars;
 
@@ -1063,9 +1063,42 @@ ssize_t chomp_ngx_str (ngx_str_t *ngx_str)
 
     int length = ngx_str->len;
     --length;
-    while (ngx_str->data[length] == '\r' || ngx_str->data[length] == '\n')
-    {
+    while (ngx_str->data[length] == '\r' || ngx_str->data[length] == '\n') {
         //ngx_str->data[length] = '\0';
+        chars++;
+
+        /* Stop once we get to zero to prevent wrap-around */
+        if (length-- == 0)
+                break;
+    }
+
+    ngx_str->len = ngx_str->len - chars;
+    return chars;
+}
+
+ssize_t chomp_space_ngx_str(ngx_str_t *ngx_str)
+{
+    size_t chars;
+
+    assert (ngx_str->data != NULL);
+    assert (ngx_str->len > 0);
+
+    /* Make sure the arguments are valid */
+    if (ngx_str->data == NULL)
+        return -EFAULT;
+    if (ngx_str->len < 1)
+        return -ERANGE;
+
+    chars = 0;
+
+    while (ngx_str->data[chars] == ' ') {
+        ngx_str->data++;
+        chars++;
+    }
+
+    int length = ngx_str->len - chars;
+    --length;
+    while (ngx_str->data[length] == '\r' || ngx_str->data[length] == '\n') {
         chars++;
 
         /* Stop once we get to zero to prevent wrap-around */

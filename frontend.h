@@ -20,22 +20,21 @@ enum http_state{
     HTTP_STATE_RELAY,
 };
 
+#define bit_request         ( 1 << 0)
+#define bit_host            ( 1 << 1)
+#define bit_user_agent      ( 1 << 2)
+
+#define bit_done            (bit_request | bit_host)
+
 struct http_parse_block {
     int                     start;
-    int                     end;
     int                     pos;
     
     ngx_str_t               request_line;
-    ngx_str_t               user_agent;
     ngx_str_t               host;
-    
-    unsigned int            connect_method;
-    uint64_t                content_length;
+    ngx_str_t               user_agent;
 
-    uint8_t                 headers_finish;
-    uint8_t                 content_finish;
-    
-    struct request_s        request;
+    uint32_t                done_map;
 };
 
 
@@ -45,11 +44,12 @@ struct frontend_sk_node {
 
     int                         fd;
     uint32_t                    seq_id;
+    uint32_t                    backend_id;
 
     uint32_t                    ip;
     uint16_t                    port;
 
-    uint32_t                    user_block_id;
+    uint32_t                    user_id;
     uint32_t                    front_listen_id;
 
     void                        *p_my_table;

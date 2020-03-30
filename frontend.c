@@ -15,6 +15,7 @@
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <arpa/inet.h>
+#include <assert.h>
 
 #include "main.h"
 #include "log.h"
@@ -24,12 +25,15 @@
 #include "unique_id.h"
 #include "misc.h"
 #include "hash_table.h"
+#include "domain_map.h"
 
 
 struct accept_socket_table g_frontend_accept_socket_table;
 
 const ngx_str_t g_ngx_str_host = ngx_string("Host");
 const ngx_str_t g_ngx_str_content_type = ngx_string("Content-type");
+const ngx_str_t g_ngx_str_user_agent = ngx_string("User-agent");
+const ngx_str_t g_ngx_str_content_length = ngx_string("Content-length");
 
 #if 1
 
@@ -143,19 +147,26 @@ void frontend_sk_raw_del(struct frontend_sk_node *sk)
 
     free_frontend_socket_node(sk);
 }
+
 int frontend_http_relay_data(struct frontend_sk_node *sk)
 {
     struct notify_node *p_notify_node = sk->p_recv_node;
     sk->p_recv_node = NULL;
 
-    return backend_notify_send_data(p_notify_node, sk->seq_id, 0);
+    return backend_notify_send_data(p_notify_node, sk->seq_id, sk->backend_id);
 }
+
 int http_parse_block_init(struct frontend_sk_node *sk)
 {
-    struct http_parse_block        *p_parse_block = &sk->http_parse_block;
-    struct socket_notify_block  *p_recv_node = sk->p_recv_node;
+    struct http_parse_block     *p_parse_block = &sk->parse_block;
+    struct notify_node  *p_recv_node = sk->p_recv_node;
 
     p_parse_block->start = p_parse_block->pos = p_recv_node->pos;
+
+    ngx_str_null(&p_parse_block->request_line);
+    ngx_str_null(&p_parse_block->host);
+    ngx_str_null(&p_parse_block->user_agent);
+    p_parse_block->done_map = 0;
 
     return SUCCESS;
 }
@@ -166,16 +177,16 @@ int http_parse_block_init(struct frontend_sk_node *sk)
 
 int http_parse_headers(struct frontend_sk_node *sk)
 {
-    struct http_parse_block        *p_parse_block = &sk->http_parse_block;
-    struct socket_notify_block  *p_recv_node = sk->p_recv_node;
+    struct http_parse_block     *p_parse_block = &sk->parse_block;
+    struct notify_node  *p_recv_node = sk->p_recv_node;
 
     assert(p_recv_node != NULL);
 
-    char    *buffer = p_recv_node->buf;
+    char    *buffer = (char *)p_recv_node->buf;
     char    *ptr    = NULL;
-    int     start   = p_http_buff->start;
-    int     end     = p_http_buff->end;
-    int     pos     = p_http_buff->pos;
+    int     start   = p_parse_block->start;
+    int     pos     = p_parse_block->pos;
+    int     end     = p_recv_node->end;
 
     assert(pos >= start);
     assert(pos <= end);
@@ -194,48 +205,65 @@ int http_parse_headers(struct frontend_sk_node *sk)
             pos = start;
 
             if (CHECK_CRLF(p_start, len)) {
-                p_http_buff->start = start;
-                p_http_buff->pos   = pos;
+                p_parse_block->start = start;
+                p_parse_block->pos   = pos;
 
                 return SUCCESS;
             }
 
             ngx_str_t header = {
-                .data = p_start,
-                .len = len;
+                .data = (uint8_t *)p_start,
+                .len = len
             };
 
-            if (p_http_buff->request_line.data == NULL) {
-                p_http_buff->request_line = header;
-            } else {
-                ngx_str_t line;
-                line.data = (uint8_t *)p_start;
-                line.len = len;
+            char header_buf[200];
+            DBG_PRINTF(DBG_WARNING, "header [%s]\n",
+                    ngx_print(header_buf, 200, &header));
 
-                if (chomp_ngx_str (&line) == len)
-                {
-                    fi->close_reason = FRONT_SOCKET_CLOSE_REASON_TYPE_REQ_PARSE_FAILED;
-                    return -1;
-                }
-                if (ngx_casecmp(&header, ) == 0) {
-                }
-                int ret = http_add_header_to_map(&p_http_buff->map, &line);
-                if (ret < 0)
-                {
-                    fi->close_reason = FRONT_SOCKET_CLOSE_REASON_TYPE_REQ_PARSE_FAILED;
-                    return ret;
+            if (p_parse_block->request_line.data == NULL) {
+                p_parse_block->request_line = header;
+                p_parse_block->done_map |= bit_request;
+            } else {
+                char *p_colon;
+
+                p_colon = (char *)memchr(p_start, ':', len);
+                if (!p_colon)
+                    return FAIL;
+
+                int header_len = p_colon - p_start;
+                if (header_len < 1)
+                    return FAIL;
+
+                ngx_str_t header_name = {
+                    .data = (uint8_t *)p_start,
+                    .len = header_len
+                };
+                ngx_str_t header_value = {
+                    .data = (uint8_t *)p_colon + 1,
+                    .len = len - header_len - 1
+                };
+
+                char header_name_buf[200];
+                char header_value_buf[200];
+                DBG_PRINTF(DBG_WARNING, "header_name [%s], value [%s]\n",
+                        ngx_print(header_name_buf, 200, &header_name),
+                        ngx_print(header_value_buf, 200, &header_value));
+                if (ngx_casecmp(&header_name, &g_ngx_str_host) == 0) {
+                    p_parse_block->host = header_value;
+                    p_parse_block->done_map |= bit_host;
+                } else if (ngx_casecmp(&header_name, &g_ngx_str_user_agent) == 0) {
+                    p_parse_block->user_agent = header_value;
+                    p_parse_block->done_map |= bit_user_agent;
                 }
             }
-        }
-        else
-        {
+        } else {
             break;
         }
     }
 
-    p_http_buff->pos    = p_http_buff->end;
-    p_http_buff->start  = start;
-    return 0;
+    p_parse_block->pos    = end;
+    p_parse_block->start  = start;
+    return NEED_MORE;
 }
 /*
  * parse http header
@@ -248,9 +276,35 @@ int frontend_http_process(struct frontend_sk_node *sk)
     switch(sk->state) {
 
     case HTTP_STATE_INIT:
+        http_parse_block_init(sk);
+        sk->state = HTTP_STATE_REQUEST;
 
     case HTTP_STATE_REQUEST:
-        http_parse_headers(sk);
+        ret = http_parse_headers(sk);
+        if (ret == FAIL) {
+            return ret;
+        }
+
+        if (sk->parse_block.done_map | bit_done) {
+            char header_name_buf[200];
+            char header_value_buf[200];
+            DBG_PRINTF(DBG_WARNING, "header_name [%s], value [%s]\n",
+                    ngx_print(header_name_buf, 200, &sk->parse_block.host),
+                    ngx_print(header_value_buf, 200, &sk->parse_block.request_line));
+            if (chomp_space_ngx_str(&sk->parse_block.host) < 0)
+                return FAIL;
+
+            struct domain_node domain_node;
+            ret = domain_map_query(&domain_node, &sk->parse_block.host);
+            if (ret == FAIL)
+                return ret;
+
+            sk->state = HTTP_STATE_RELAY;
+
+            sk->user_id = domain_node.user_id;
+            sk->backend_id = domain_node.backend_id;
+            ret = frontend_http_relay_data(sk);
+        }
         break;
     case HTTP_STATE_RELAY:
         ret = frontend_http_relay_data(sk);
@@ -291,7 +345,11 @@ void frontend_socket_read_cb(void *v)
         int nread = recv(sk->fd, p_recv_node->buf + p_recv_node->end, to_recv, MSG_DONTWAIT);
         if (nread > 0) {
             p_recv_node->end += nread;
-            frontend_http_process(sk);
+            log_dump_hex(p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
+            if (FAIL == frontend_http_process(sk)) {
+                sk->exit_cb(sk);
+                return;
+            }
             continue;
         }
 
@@ -430,8 +488,7 @@ void frontend_socket_exit_cb(void *v)
     struct frontend_work_thread_table *p_table = sk->p_my_table;
 
     if (sk->status == SOCKET_STATUS_DEL) {
-        DBG_PRINTF(DBG_ERROR, "user %u seq_id %u:%d front_listen_id:%u critical error alread del\n",
-                sk->user_block_id,
+        DBG_PRINTF(DBG_ERROR, "seq_id %u:%d front_listen_id:%u critical error alread del\n",
                 sk->seq_id,
                 sk->fd,
                 sk->front_listen_id);
@@ -512,9 +569,11 @@ void frontend_event_connect(struct frontend_work_thread_table *p_table, struct f
     }
 
     p_node->p_my_table      = p_table;
-    p_node->user_block_id   = 0;
+    p_node->backend_id      = 0;
+    p_node->user_id         = 0;
     p_node->front_listen_id = 0;
     p_node->status          = SOCKET_STATUS_NEW;
+    p_node->state           = HTTP_STATE_INIT;
     p_node->type            = FRONTEND_SOCKET_TYPE_READY;
     p_node->blocked         = 0;
     p_node->read_cb         = frontend_socket_read_cb;

@@ -30,8 +30,6 @@
 
 struct accept_socket_table g_backend_accept_socket_table;
 
-int g_debug_backend_id = 0;
-
 #if 1
 
 struct buff_table g_backend_socket_buff_table;
@@ -905,7 +903,8 @@ int backend_notify_new_socket(struct backend_sk_node *p_node)
 int backend_notify_send_data(struct notify_node *p_notify_node, uint32_t src_id, uint32_t dst_id)
 {
     p_notify_node->type   = PIPE_NOTIFY_TYPE_SEND;
-    p_notify_node->dst_id = g_debug_backend_id;
+    p_notify_node->src_id = src_id;
+    p_notify_node->dst_id = dst_id;
 
     uint16_t control_len = BACKEND_HDR_LEN + sizeof(struct backend_data);
     if (control_len > p_notify_node->pos) {
@@ -954,7 +953,7 @@ void backend_socket_handle_accpet_cb()
         return;
     }
 
-    g_debug_backend_id = p_node->seq_id;
+    //g_debug_backend_id = p_node->seq_id;
     uint32_t ip = ntohl(client_addr.sin_addr.s_addr);
 
     p_node->id_hash_node.prev = p_node->id_hash_node.next = NULL;

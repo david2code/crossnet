@@ -208,6 +208,7 @@ bool is_new_hour(time_t last_time, time_t now_time);
 int get_hour(time_t now_time);
 ssize_t chomp (char *buffer, size_t length);
 ssize_t chomp_ngx_str (ngx_str_t *ngx_str);
+ssize_t chomp_space_ngx_str(ngx_str_t *ngx_str);
 int base64_encode( const unsigned char * bindata, unsigned char *base64, int binlength, int out_len);
 int base64_decode(const char *base64, unsigned char *bindata);
 inline uint32_t  get_network_from_ip(uint32_t ip);

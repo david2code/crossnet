@@ -191,7 +191,11 @@ int domain_map_query(struct domain_node *p_domain_node, ngx_str_t *p_ngx_domain)
     if (p_entry) {
         memcpy(p_domain_node, p_entry, sizeof(struct domain_node));
     } else {
-        DBG_PRINTF(DBG_WARNING, "domain %s not found\n", p_domain_node->domain);
+        if (g_main_debug > DBG_WARNING) {
+            char domain[DOMAIN_MAX_LEN + 1];
+            DBG_PRINTF(DBG_WARNING, "domain %s not found\n",
+                    ngx_print(domain, DOMAIN_MAX_LEN, p_ngx_domain));
+        }
         ret = FAIL;
     }
 

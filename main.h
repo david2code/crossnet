@@ -6,7 +6,7 @@
 
 #define USER_NUM      100
 
-#define FRONTEND_PORT   81
+#define FRONTEND_PORT   80
 //#define FRONTEND_PORT   443
 #define FRONTEND_WORK_THREAD_NUM    4
 
