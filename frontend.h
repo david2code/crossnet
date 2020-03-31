@@ -8,6 +8,8 @@
 #define FRONTEND_SOCKET_MAX_NUM         5000
 #define FRONTEND_THREAD_HASH_SIZE       (FRONTEND_SOCKET_MAX_NUM / FRONTEND_WORK_THREAD_NUM)
 
+#define FRONTEND_LISTEN_SOCKET_MAX_NUM  65535
+
 #define FRONTEND_ACCEPT_EPOLL_MAX_EVENTS     5000
 #define FRONTEND_ACCEPT_LISTEN_BACKLOG       500
 
@@ -49,6 +51,8 @@ struct frontend_sk_node {
     uint32_t                    ip;
     uint16_t                    port;
 
+    uint16_t                    my_port;
+
     uint32_t                    user_id;
     uint32_t                    front_listen_id;
 
@@ -89,6 +93,38 @@ struct frontend_work_thread_table {
 
     struct hash_table       hash;
     struct notify_table     notify;
+
+    int                     event_fd;
+    int                     epfd;
+    struct epoll_event      *events;
+};
+
+
+struct frontend_listen_sk_node {
+    struct list_head            list_head;
+    struct list_head            hash_node;
+
+    int                         fd;
+    uint32_t                    backend_id;
+
+    uint16_t                    my_port;
+
+    uint32_t                    user_id;
+    uint32_t                    front_listen_id;
+
+    time_t                      last_active;
+
+    uint8_t                     status;
+
+    uint8_t                     type;
+
+    void                        (*accept_cb)(void *v);
+    void                        (*exit_cb)(void *v);
+};
+
+struct frontend_accept_socket_table {
+    struct list_table       list;
+    struct hash_table       hash;
 
     int                     event_fd;
     int                     epfd;

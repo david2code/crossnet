@@ -28,13 +28,14 @@
 #include "domain_map.h"
 
 
-struct accept_socket_table g_frontend_accept_socket_table;
+struct frontend_accept_socket_table g_frontend_accept_socket_table;
 
 const ngx_str_t g_ngx_str_host = ngx_string("Host");
 const ngx_str_t g_ngx_str_content_type = ngx_string("Content-type");
 const ngx_str_t g_ngx_str_user_agent = ngx_string("User-agent");
 const ngx_str_t g_ngx_str_content_length = ngx_string("Content-length");
 
+void frontend_listen_socket_handle_accpet_cb(void *v);
 #if 1
 
 struct buff_table g_frontend_socket_buff_table;
@@ -82,9 +83,69 @@ void frontend_move_node_to_list(struct frontend_sk_node *sk, int type)
     }
 }
 
+#if 2
+
+struct buff_table g_frontend_listen_socket_buff_table;
+
+void frontend_listen_socket_buff_table_init()
+{
+    buff_table_init(&g_frontend_listen_socket_buff_table, FRONTEND_LISTEN_SOCKET_MAX_NUM, sizeof(struct frontend_listen_sk_node), "g_frontend_listen_socket_buff_table");
+}
+
+inline struct frontend_listen_sk_node *malloc_frontend_listen_socket_node()
+{
+    return (struct frontend_listen_sk_node *)buff_table_malloc_node(&g_frontend_listen_socket_buff_table);
+}
+
+inline void free_frontend_listen_socket_node(struct frontend_listen_sk_node *p_node)
+{
+    buff_table_free_node(&g_frontend_listen_socket_buff_table, &p_node->list_head);
+}
+
+void display_g_frontend_listen_socket_buff_table()
+{
+    display_buff_table(&g_frontend_listen_socket_buff_table);
+}
+
+#endif
+
+int frontend_listen_port_init(uint16_t listen_port)
+{
+    struct frontend_accept_socket_table *p_table = (struct frontend_accept_socket_table *)&g_frontend_accept_socket_table;
+    int server_socket_fd = create_listen_socket(listen_port, FRONTEND_ACCEPT_LISTEN_BACKLOG);
+
+    if (server_socket_fd < 0) {
+        DBG_PRINTF(DBG_ERROR, "create listen socket failed at %d, errnum: %d\n",
+                listen_port,
+                server_socket_fd);
+        return FAIL;
+    } else {
+        DBG_PRINTF(DBG_WARNING, "create listen socket success at %d, server_socket_fd: %d\n",
+                listen_port,
+                server_socket_fd);
+    }
+
+    struct frontend_listen_sk_node *p_node = malloc_frontend_listen_socket_node();
+    if (p_node == NULL) {
+        DBG_PRINTF(DBG_WARNING, "malloc error\n");
+        close(server_socket_fd);
+        return FAIL;
+    }
+
+    p_node->fd = server_socket_fd;
+    p_node->my_port = listen_port;
+    p_node->backend_id = 0;
+    p_node->accept_cb = frontend_listen_socket_handle_accpet_cb;
+
+    set_none_block(p_node->fd);
+    add_event(p_table->epfd, p_node->fd, p_node, EPOLLIN);
+
+    return 0;
+}
+
 int frontend_accept_init()
 {
-    struct accept_socket_table *p_table = (struct accept_socket_table *)&g_frontend_accept_socket_table;
+    struct frontend_accept_socket_table *p_table = (struct frontend_accept_socket_table *)&g_frontend_accept_socket_table;
 
     p_table->events = (struct epoll_event *)malloc(sizeof(struct epoll_event) * FRONTEND_ACCEPT_EPOLL_MAX_EVENTS);
     if (p_table->events == NULL)
@@ -92,23 +153,10 @@ int frontend_accept_init()
 
     p_table->epfd = epoll_create(FRONTEND_ACCEPT_EPOLL_MAX_EVENTS);
 
-    uint16_t    listen_port = FRONTEND_PORT;
-    int server_socket_fd = create_listen_socket(listen_port, FRONTEND_ACCEPT_LISTEN_BACKLOG);
-    if (server_socket_fd < 0) {
-        DBG_PRINTF(DBG_ERROR, "create listen socket failed at %d, errnum: %d\n",
-                listen_port,
-                server_socket_fd);
+    if (FAIL == frontend_listen_port_init(FRONTEND_HTTP_PORT))
         exit(EXIT_FAILURE);
-    } else {
-        DBG_PRINTF(DBG_WARNING, "create listen socket success at %d, server_socket_fd: %d\n",
-                listen_port,
-                server_socket_fd);
-    }
-
-    p_table->fd              = server_socket_fd;
-
-    set_none_block(p_table->fd);
-    add_event(p_table->epfd, p_table->fd, NULL, EPOLLIN);
+    if (FAIL == frontend_listen_port_init(FRONTEND_HTTPS_PORT))
+        exit(EXIT_FAILURE);
 
     return 0;
 }
@@ -636,7 +684,6 @@ void frontend_event_read_cb(void *v)
                     break;
 
                 case PIPE_NOTIFY_TYPE_FREE:
-                    //manage_unuse_notify_free_socket_node(p_my_table, p_entry);
                     break;
 
                 case PIPE_NOTIFY_TYPE_CONNECT:
@@ -749,18 +796,6 @@ void *frontend_thread_socket_process(void *arg)
             }
         }
 
-#if 0
-        time_t now = time(NULL);
-        if ((now - last_time) > LT_MANAGE_SOCKET_CHECK_PERIOD_SECONDS)
-        {
-            last_time = now;
-            manage_old_process(&p_table->list_head[MANAGE_UNUSE_SOCKET_TYPE_READY], MANAGE_UNUSE_SOCKET_TYPE_READY, LT_MANAGE_SOCKET_TIMEOUT_MAX_SECONDS, p_table->table_name);
-        }
-
-        //pthread_mutex_unlock(&p_table->mutex);
-
-        manage_del_process(&p_table->list_head[MANAGE_UNUSE_SOCKET_TYPE_DEL], p_table->table_name);
-#endif
     }
 
     DBG_PRINTF(DBG_WARNING, "leave timestamp %d\n", time(NULL));
@@ -805,6 +840,7 @@ int frontend_thread_pool_init()
 int frontend_init()
 {
     frontend_socket_buff_table_init();
+    frontend_listen_socket_buff_table_init();
     frontend_accept_init();
     frontend_thread_pool_init();
     return 0;
@@ -846,12 +882,12 @@ int frontend_notify_send_data(struct notify_node *p_notify_node, uint32_t src_id
     return 0;
 }
 
-void frontend_socket_handle_accpet_cb()
+void frontend_listen_socket_handle_accpet_cb(void *v)
 {
-    struct accept_socket_table *p_table = (struct accept_socket_table *)&g_frontend_accept_socket_table;
+    struct frontend_listen_sk_node *p_listen_node = (struct frontend_listen_sk_node *)v;
     struct sockaddr_in  client_addr;
     socklen_t           length          = sizeof(client_addr);
-    int                 new_socket      = accept(p_table->fd, (struct sockaddr*)&client_addr, &length);
+    int                 new_socket      = accept(p_listen_node->fd, (struct sockaddr*)&client_addr, &length);
 
     if (new_socket < 0) {
         DBG_PRINTF(DBG_ERROR, "Accept Failed! error no: %d, error msg: %s\n",
@@ -877,6 +913,7 @@ void frontend_socket_handle_accpet_cb()
     p_node->fd              = new_socket;
     p_node->ip              = ip;
     p_node->port            = ntohs(client_addr.sin_port);
+    p_node->my_port         = p_listen_node->my_port;
     p_node->p_recv_node     = NULL;
     p_node->last_active     = time(NULL);
     p_node->blocked         = 0;
@@ -906,7 +943,7 @@ void frontend_socket_handle_accpet_cb()
 
 void *frontend_accept_process(void *arg)
 {
-    struct accept_socket_table *p_table = &g_frontend_accept_socket_table;
+    struct frontend_accept_socket_table *p_table = &g_frontend_accept_socket_table;
 
     prctl(PR_SET_NAME, __FUNCTION__);
 
@@ -917,11 +954,11 @@ void *frontend_accept_process(void *arg)
 
         int i;
         for (i= 0; i < nfds; ++i) {
+            struct frontend_listen_sk_node *sk = (struct frontend_listen_sk_node *)(p_table->events[i].data.ptr);
             if (p_table->events[i].events & EPOLLIN) {
-                frontend_socket_handle_accpet_cb();
+                sk->accept_cb(sk);
             } else {
-                DBG_PRINTF(DBG_ERROR, "frontend: %d, unknown event: %d\n",
-                        p_table->fd,
+                DBG_PRINTF(DBG_ERROR, "unknown event: %d\n",
                         p_table->events[i].events);
             }
         }

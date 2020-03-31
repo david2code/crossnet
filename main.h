@@ -6,8 +6,8 @@
 
 #define USER_NUM      100
 
-#define FRONTEND_PORT   80
-//#define FRONTEND_PORT   443
+#define FRONTEND_HTTP_PORT   80
+#define FRONTEND_HTTPS_PORT   443
 #define FRONTEND_WORK_THREAD_NUM    4
 
 #define BACKEND_PORT   66
