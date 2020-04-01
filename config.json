@@ -1,0 +1,9 @@
+{
+
+    "mysql_name": "root",
+    "mysql_pass": "xx_78NumberRT",
+    "mysql_port": 3306,
+    "debug_level": 1,
+
+    "log_file": "/var/log/crossnet.log"
+}

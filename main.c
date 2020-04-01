@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include <sys/prctl.h>
+#include <json-c/json.h>
 
 #include "main.h"
 #include "log.h"
@@ -23,6 +24,8 @@
 #include "dc_mysql.h"
 #include "user.h"
 #include "domain_map.h"
+
+struct ctx g_ctx;
 
 int g_main_running = 1;
 int g_main_debug = DBG_NORMAL;
@@ -142,10 +145,140 @@ int init()
     return 0;
 }
 
+int parse_json_config(char *config_str)
+{
+    int ret = SUCCESS;
+    struct ctx *p_ctx = &g_ctx;
+
+    json_object *obj = json_tokener_parse(config_str);
+    if (!obj) {   
+        printf("json_parse_error\n");
+        ret = FAIL;
+        goto JSON_ERROR_END;
+    }
+
+    json_type type = json_object_get_type(obj);
+    if(type != json_type_object) {   
+        printf("json_type: %d\n", type);
+        ret = FAIL;
+        goto JSON_ERROR_END;
+    }
+
+    json_object_object_foreach(obj, key, val) {   
+        json_type type =json_object_get_type(val);
+
+        if (strcmp(key, "mysql_name") == 0) {   
+            if(type == json_type_string) {
+                snprintf(p_ctx->mysql_name, USER_NAME_MAX_LEN + 1, "%s", json_object_get_string(val));
+                p_ctx->mysql_name[USER_NAME_MAX_LEN] = 0;
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "mysql_pass") == 0) {   
+            if(type == json_type_string) {
+                snprintf(p_ctx->mysql_pass, PASSWORD_MAX_LEN + 1, "%s", json_object_get_string(val));
+                p_ctx->mysql_pass[PASSWORD_MAX_LEN] = 0;
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "mysql_port") == 0) {   
+            if(type == json_type_int) {
+                p_ctx->mysql_port = json_object_get_int(val);
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "debug_level") == 0) {   
+            if(type == json_type_int) {
+                p_ctx->debug_level = json_object_get_int(val);
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "log_file") == 0) {   
+            if(type == json_type_string) {
+                snprintf(p_ctx->log_file, LOG_FILE_NAME_MAX_LEN + 1, "%s", json_object_get_string(val));
+                p_ctx->log_file[LOG_FILE_NAME_MAX_LEN] = 0;
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else {
+            printf("unknown json key: %s\n", key);
+        }
+    }
+
+JSON_ERROR_END:
+    json_object_put(obj);
+
+    return ret;
+}
+
+int check_and_print_ctx()
+{
+    struct ctx *p_ctx = &g_ctx;
+
+    if (!p_ctx->mysql_name[0]) {
+        printf("user_name should not be empty!\n");
+        return FAIL;
+    }
+    if (!p_ctx->mysql_pass[0]) {
+        printf("mysql_pass should not be empty!\n");
+        return FAIL;
+    }
+    if (p_ctx->mysql_port < 1) {
+        printf("mysql_port should not be zero!\n");
+        return FAIL;
+    }
+    g_main_debug = p_ctx->debug_level;
+
+    printf("config success!\n");
+    printf("mysql_name: %s\n", p_ctx->mysql_name);
+    printf("mysql_pass: %s\n", p_ctx->mysql_pass);
+    printf("mysql_port: %hu\n", p_ctx->mysql_port);
+    printf("debug_level: %d\n", p_ctx->debug_level);
+    printf("log_file: %s\n", p_ctx->log_file);
+
+    return SUCCESS;
+}
+
+int load_config_from_json_file(char *config)
+{
+    FILE  *fp        = NULL;
+    char buffer[2048] = {0};
+    int ret = 0;
+
+    if (config == NULL) {
+        printf("config file not found!\n");
+        return FAIL;
+    }
+
+    if (NULL == (fp = fopen(config, "r"))) {
+        printf("open %s failed!\n", config);
+        return FAIL;
+    }
+
+    ret = fread(buffer, 1, 2048, fp);
+    if (ret <= 0) {
+        printf("config file %s empty!\n", config);
+        return FAIL;
+    }
+    if (ret >= 2048) {
+        printf("config file %s too big!\n", config);
+        return FAIL;
+    }
+
+    //printf("%d\n", ret);
+    //printf("%s\n", buffer);
+    return parse_json_config(buffer);
+}
+
 int main(int argc, char **argv)
 {
     bool daemon = false;
-    char *config = "main.conf";
+    char *config = "config.json";
 
     //test_heap_timer();
     //return 0;
@@ -180,13 +313,18 @@ int main(int argc, char **argv)
         }
     }
 
-#if 0
-    if (-1 == load_config_from_file(config, my_index, my_name)) {
+    memset(&g_ctx, 0, sizeof(struct ctx));
+    g_ctx.debug_level = DBG_NORMAL;
+
+    if (FAIL == load_config_from_json_file(config)) {
         exit(EXIT_FAILURE);
     }
-#endif
 
-    log_init("/var/log/crossnet.log");
+    if (FAIL == check_and_print_ctx()) {
+        exit(EXIT_FAILURE);
+    }
+
+    log_init(g_ctx.log_file);
 
     if (daemon) {
         main_daemon();

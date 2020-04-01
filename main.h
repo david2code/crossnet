@@ -10,16 +10,17 @@
 #define FRONTEND_HTTPS_PORT   443
 #define FRONTEND_WORK_THREAD_NUM    4
 
-#define BACKEND_PORT   66
+#define BACKEND_PORT   46
 #define BACKEND_WORK_THREAD_NUM    4
 
-#define USER_PORT     (800)
+#define USER_PORT     45
 
 #define TABLE_NAME_LEN     50
 #define USER_NAME_MAX_LEN  64
 #define PASSWORD_MAX_LEN   64
 #define DOMAIN_MAX_LEN     64
 #define MD5_MAX_LEN        32
+#define LOG_FILE_NAME_MAX_LEN   100
 
 #define MAX_BUFF_SIZE            2048
 
@@ -40,6 +41,16 @@ struct list_table {
     uint32_t            num;
 };
 
+struct ctx {
+
+    char        mysql_name[USER_NAME_MAX_LEN + 1];
+    char        mysql_pass[PASSWORD_MAX_LEN + 1];
+    uint16_t    mysql_port;
+
+    int         debug_level;
+
+    char        log_file[LOG_FILE_NAME_MAX_LEN + 1];
+};
 
 struct accept_socket_table {
     int                     fd;

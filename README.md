@@ -13,18 +13,18 @@ transfer ip address to location
 usage:
 
     display
-        curl "http://127.0.0.1:800/debug?display_g_user_table"
-        curl "http://127.0.0.1:800/debug?display_g_domain_map_table"
+        curl "http://127.0.0.1:45/debug?display_g_user_table"
+        curl "http://127.0.0.1:45/debug?display_g_domain_map_table"
 
     add_account
-        curl "http://127.0.0.1:800/add_account?user_name=xx&password=yy&domain=www.david.com&end_time=1593399542&total_flow=200000"
+        curl "http://127.0.0.1:45/add_account?user_name=xx&password=yy&domain=www.david.com&end_time=1593399542&total_flow=200000"
 
     mdf_account
-        curl "http://127.0.0.1:800/mdf_account?user_name=xx&password=yy&domain=www.david.com&end_time=1593399542&total_flow=100000&used_flow=2"
+        curl "http://127.0.0.1:45/mdf_account?user_name=xx&password=yy&domain=www.david.com&end_time=1593399542&total_flow=100000&used_flow=2"
 
     del_account
-        curl "http://127.0.0.1:800/del_account?user_name=xx"
+        curl "http://127.0.0.1:45/del_account?user_name=xx"
 
     query_account
-        curl "http://127.0.0.1:800/query_account?user_name=xx"
+        curl "http://127.0.0.1:45/query_account?user_name=xx"
 

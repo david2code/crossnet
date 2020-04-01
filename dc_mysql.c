@@ -16,6 +16,7 @@
 
 MYSQL g_mysql_con;
 extern int g_main_running;
+extern struct ctx g_ctx;
 
 struct mysql_manage_table g_mysql_table;
 
@@ -115,7 +116,7 @@ int dc_mysql_connect_init()
         return -1;
     }
 
-    if (mysql_real_connect(&g_mysql_con, "127.0.0.1", "root", "xx_78NumberRT", NULL, 3306, NULL, CLIENT_MULTI_STATEMENTS)) {
+    if (mysql_real_connect(&g_mysql_con, "127.0.0.1", g_ctx.mysql_name, g_ctx.mysql_pass, NULL, g_ctx.mysql_port, NULL, CLIENT_MULTI_STATEMENTS)) {
         return 0;
     } else {
         DBG_PRINTF(DBG_WARNING,"mysql_real_connect failed, error msg: %s\n", strerror(errno));
@@ -371,6 +372,7 @@ int dc_mysql_init()
     mysql_store_buf_table_init();
 
     if (-1 == dc_mysql_connect_init()) {
+        exit(EXIT_SUCCESS);
         return -1;
     }
 
