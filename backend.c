@@ -539,13 +539,12 @@ void backend_socket_exit_cb(void *v)
     if (g_main_debug >= DBG_WARNING) {
         char ip_str[30];
         uint32_t ip = htonl(sk->ip);
-        DBG_PRINTF(DBG_WARNING, "exit seq_id %u:%d front_listen_id:%u connect from %s:%d, alive_cnt: %u, ttl: %d\n",
+        DBG_PRINTF(DBG_WARNING, "exit seq_id %u:%d front_listen_id:%u connect from %s:%d, ttl: %d\n",
                 sk->seq_id,
                 sk->fd,
                 sk->front_listen_id,
                 inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str)),
                 sk->port,
-                sk->alive_cnt,
                 time(NULL) - sk->last_active);
     }
 #if 0
@@ -584,7 +583,7 @@ void backend_socket_del_cb(void *v)
         free_notify_node(p_entry);
     }
 
-    DBG_PRINTF(DBG_NORMAL, "user %u del socket %u:%d free send node: %d\n",
+    DBG_PRINTF(DBG_NORMAL, "del socket %u:%d free send node\n",
             sk->seq_id,
             sk->fd);
 

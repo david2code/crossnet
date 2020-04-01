@@ -19,6 +19,7 @@
 enum http_state{
     HTTP_STATE_INIT,
     HTTP_STATE_REQUEST,
+    HTTP_STATE_HELLO,
     HTTP_STATE_RELAY,
 };
 
@@ -27,6 +28,42 @@ enum http_state{
 #define bit_user_agent      ( 1 << 2)
 
 #define bit_done            (bit_request | bit_host)
+
+#if 1
+//tls defines
+
+enum tls_content_type {
+    TLS_CONTENT_TYPE_HANDSHAKE = 22,
+};
+
+enum handshake_type {
+    HANDSHAKE_TYPE_CLIENT_HELLO = 1,
+};
+
+enum extension_type {
+    EXTENSION_TYPE_SERVER_NAME = 0,
+};
+
+struct tls_hdr {
+    uint8_t                 content_type;
+    uint16_t                version;
+    uint16_t                length;
+}__attribute__((packed));
+
+struct handshake_hdr {
+    uint32_t                type:8;
+    uint32_t                length:24;
+    uint16_t                version;
+    uint8_t                 random[32];
+}__attribute__((packed));
+
+struct tlv_hdr {
+    uint16_t       type;
+    uint16_t       length;
+    uint8_t        value[0];
+}__attribute__((packed));
+
+#endif
 
 struct http_parse_block {
     int                     start;

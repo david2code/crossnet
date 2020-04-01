@@ -313,6 +313,138 @@ int http_parse_headers(struct frontend_sk_node *sk)
     p_parse_block->start  = start;
     return NEED_MORE;
 }
+
+int https_parse_hello(struct frontend_sk_node *sk)
+{
+    struct http_parse_block *p_parse_block = &sk->parse_block;
+    struct notify_node  *p_recv_node = sk->p_recv_node;
+
+    assert(p_recv_node != NULL);
+
+    int data_len = p_recv_node->end - p_recv_node->pos;
+
+    if (data_len < sizeof(struct tls_hdr)) {
+        return NEED_MORE;
+    }
+
+    struct tls_hdr *p_hdr = (struct tls_hdr *)(p_recv_node->buf + p_recv_node->pos);
+
+
+    if (TLS_CONTENT_TYPE_HANDSHAKE != p_hdr->content_type) {
+        return FAIL;
+    }
+
+    uint16_t length = ntohs(p_hdr->length);
+
+    if (data_len < (sizeof(struct tls_hdr) + length)) {
+        return NEED_MORE;
+    }
+
+    struct handshake_hdr *p_handshake_hdr = (struct handshake_hdr *)(p_hdr + 1);
+
+    if (g_main_debug >= DBG_WARNING) {
+        uint32_t length = p_handshake_hdr->length;
+        DBG_PRINTF(DBG_WARNING, "handshake type [%hhu], length [%u]\n",
+                p_handshake_hdr->type,
+                ntohl(length));
+    }
+    if (HANDSHAKE_TYPE_CLIENT_HELLO != p_handshake_hdr->type) {
+        DBG_PRINTF(DBG_WARNING, "unknown handshake type [%u]\n",
+                p_handshake_hdr->type);
+        return FAIL;
+    }
+
+    uint8_t *p_lv_pos = (uint8_t *)(p_handshake_hdr + 1);
+    uint8_t *p_lv_end = p_recv_node->buf + p_recv_node->end;
+
+
+    //session_id
+    uint8_t session_id_length = *(uint8_t *)p_lv_pos;
+    p_lv_pos += 1 + session_id_length;
+    if (p_lv_pos > p_lv_end) {
+        DBG_PRINTF(DBG_WARNING, "session_id_length [%u]\n",
+                session_id_length);
+        return FAIL;
+    }
+
+    //cipher suites
+    uint16_t cipher_suites_length = ntohs(*(uint16_t *)p_lv_pos);
+    p_lv_pos += 2 + cipher_suites_length;
+    if (p_lv_pos > p_lv_end) {
+        DBG_PRINTF(DBG_WARNING, "cipher_suites_length [%u]\n",
+                cipher_suites_length);
+        return FAIL;
+    }
+
+    //compression_methods_id
+    uint8_t compression_methods_length = *(uint8_t *)p_lv_pos;
+    p_lv_pos += 1 + compression_methods_length;
+    if (p_lv_pos > p_lv_end) {
+        DBG_PRINTF(DBG_WARNING, "compression_methods_length [%u]\n",
+                compression_methods_length);
+        return FAIL;
+    }
+
+    //extensions length
+    uint16_t extensions_length = ntohs(*(uint16_t *)p_lv_pos);
+
+    uint8_t *p_extensions_start = p_lv_pos + 2;
+    uint8_t *p_extensions_end = p_extensions_start + extensions_length;
+
+    if (p_extensions_end > p_lv_end) {
+        DBG_PRINTF(DBG_WARNING, "extensions_length [%u]\n",
+                extensions_length);
+        return FAIL;
+    }
+
+    while(p_extensions_start < p_extensions_end) {
+        struct tlv_hdr *p_tlv = (struct tlv_hdr *)p_extensions_start;
+
+        uint16_t type = ntohs(p_tlv->type);
+        uint16_t length = ntohs(p_tlv->length);
+
+        p_extensions_start += sizeof(struct tlv_hdr) + length;
+        if (p_extensions_start > p_extensions_end)
+            return FAIL;
+
+        switch(type) {
+
+        case EXTENSION_TYPE_SERVER_NAME: {
+            uint16_t *p_list_length = (uint16_t *)p_tlv->value;
+            uint16_t list_length = *p_list_length;
+            list_length = ntohs(list_length);
+            if (list_length <= sizeof(struct tlv_hdr)) {
+                return FAIL;
+            }
+
+            tlv_node_t *p_server_name_tlv = (tlv_node_t *)(p_tlv->value + 2);
+
+            if (p_server_name_tlv->type != 0) {
+                return FAIL;
+            }
+
+            uint16_t server_name_length = ntohs(p_server_name_tlv->length);
+            if (server_name_length > DOMAIN_MAX_LEN) {
+                return FAIL;
+            }
+
+            p_parse_block->host.data = p_server_name_tlv->value;
+            p_parse_block->host.len = server_name_length;
+            p_parse_block->done_map |= bit_host;
+
+            return SUCCESS;
+            break;
+        }
+
+        default:
+            break;
+        }
+
+    }
+
+    return FAIL;
+}
+
 /*
  * parse http header
  * according to host, deliver package to guest
@@ -321,11 +453,41 @@ int frontend_http_process(struct frontend_sk_node *sk)
 {
     int ret = SUCCESS;
 
+    if (sk->state == HTTP_STATE_INIT) {
+        http_parse_block_init(sk);
+        if (sk->my_port == FRONTEND_HTTP_PORT)
+            sk->state = HTTP_STATE_REQUEST;
+        else 
+            sk->state = HTTP_STATE_HELLO;
+    }
+
     switch(sk->state) {
 
-    case HTTP_STATE_INIT:
-        http_parse_block_init(sk);
-        sk->state = HTTP_STATE_REQUEST;
+    case HTTP_STATE_HELLO:
+        ret = https_parse_hello(sk);
+        if (ret == FAIL) {
+            return ret;
+        }
+
+        if (sk->parse_block.done_map | bit_host) {
+            char host_buf[200];
+            DBG_PRINTF(DBG_WARNING, "host [%s]\n",
+                    ngx_print(host_buf, 200, &sk->parse_block.host));
+            if (chomp_space_ngx_str(&sk->parse_block.host) < 0)
+                return FAIL;
+
+            struct domain_node domain_node;
+            ret = domain_map_query(&domain_node, &sk->parse_block.host);
+            if (ret == FAIL)
+                return ret;
+
+            sk->state = HTTP_STATE_RELAY;
+
+            sk->user_id = domain_node.user_id;
+            sk->backend_id = domain_node.backend_id;
+            ret = frontend_http_relay_data(sk);
+        }
+        break;
 
     case HTTP_STATE_REQUEST:
         ret = http_parse_headers(sk);
@@ -354,11 +516,14 @@ int frontend_http_process(struct frontend_sk_node *sk)
             ret = frontend_http_relay_data(sk);
         }
         break;
+
     case HTTP_STATE_RELAY:
         ret = frontend_http_relay_data(sk);
         break;
+
     default:
         break;
+
     }
 
     return ret;
