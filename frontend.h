@@ -65,6 +65,13 @@ struct tlv_hdr {
 
 #endif
 
+enum con_err_type {
+    CON_ERR_TYPE_NONE,
+    CON_ERR_TYPE_INNER,
+    CON_ERR_TYPE_CLIENT_OFFLINE,
+    CON_ERR_TYPE_MAX
+};
+
 struct http_parse_block {
     int                     start;
     int                     pos;
@@ -107,6 +114,7 @@ struct frontend_sk_node {
 
     enum http_state             state;
     struct http_parse_block     parse_block;
+    enum con_err_type           err_type;
 
     void                        (*read_cb)(void *v);
     void                        (*write_cb)(void *v);

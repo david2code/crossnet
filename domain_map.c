@@ -152,7 +152,7 @@ EXIT:
     return ret;
 }
 
-int domain_map_delete(ngx_str_t *p_ngx_domain)
+int domain_map_delete(ngx_str_t *p_ngx_domain, uint32_t backend_id)
 {
     struct domain_map_table *p_table = &g_domain_map_table;
     int ret = SUCCESS;
@@ -161,17 +161,30 @@ int domain_map_delete(ngx_str_t *p_ngx_domain)
 
     struct domain_node *p_entry = DHASH_FIND(g_domain_map_table, &p_table->hash, p_ngx_domain);
     if (p_entry) {
-        list_del(&p_entry->hash_node);
-        list_del(&p_entry->list_head);
-        p_table->list.num--;
+        if (p_entry->backend_id == backend_id) {
+            list_del(&p_entry->hash_node);
+            list_del(&p_entry->list_head);
+            p_table->list.num--;
 
-        DBG_PRINTF(DBG_WARNING, "domain %s user_id %u backend_id %u, del success\n",
-                p_entry->domain,
-                p_entry->user_id,
-                p_entry->backend_id);
+            DBG_PRINTF(DBG_WARNING, "domain %s user_id %u backend_id %u, del success\n",
+                    p_entry->domain,
+                    p_entry->user_id,
+                    p_entry->backend_id);
 
-        free_domain_node(p_entry);
+            free_domain_node(p_entry);
+        } else {
+            DBG_PRINTF(DBG_WARNING, "domain %s backend_id unmatch %u %u, del fail\n",
+                    p_entry->domain,
+                    p_entry->backend_id,
+                    backend_id);
+
+        }
     } else {
+        if (g_main_debug > DBG_WARNING) {
+            char domain[DOMAIN_MAX_LEN + 1];
+            DBG_PRINTF(DBG_WARNING, "domain %s not found\n",
+                    ngx_print(domain, DOMAIN_MAX_LEN, p_ngx_domain));
+        }
         ret = FAIL;
     }
 

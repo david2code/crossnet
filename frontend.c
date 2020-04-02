@@ -216,6 +216,7 @@ int http_parse_block_init(struct frontend_sk_node *sk)
     ngx_str_null(&p_parse_block->user_agent);
     p_parse_block->done_map = 0;
 
+    sk->err_type = CON_ERR_TYPE_NONE;
     return SUCCESS;
 }
 
@@ -246,6 +247,7 @@ int http_parse_headers(struct frontend_sk_node *sk)
             int     len      = ptr - p_start + 1;
 
             if (len < 1) {
+                sk->err_type = CON_ERR_TYPE_INNER;
                 return FAIL;
             }
 
@@ -264,9 +266,11 @@ int http_parse_headers(struct frontend_sk_node *sk)
                 .len = len
             };
 
-            char header_buf[200];
-            DBG_PRINTF(DBG_WARNING, "header [%s]\n",
-                    ngx_print(header_buf, 200, &header));
+            if (g_main_debug >= DBG_NORMAL) {
+                char header_buf[200];
+                DBG_PRINTF(DBG_WARNING, "header [%s]\n",
+                        ngx_print(header_buf, 200, &header));
+            }
 
             if (p_parse_block->request_line.data == NULL) {
                 p_parse_block->request_line = header;
@@ -275,12 +279,16 @@ int http_parse_headers(struct frontend_sk_node *sk)
                 char *p_colon;
 
                 p_colon = (char *)memchr(p_start, ':', len);
-                if (!p_colon)
+                if (!p_colon) {
+                    sk->err_type = CON_ERR_TYPE_INNER;
                     return FAIL;
+                }
 
                 int header_len = p_colon - p_start;
-                if (header_len < 1)
+                if (header_len < 1) {
+                    sk->err_type = CON_ERR_TYPE_INNER;
                     return FAIL;
+                }
 
                 ngx_str_t header_name = {
                     .data = (uint8_t *)p_start,
@@ -291,11 +299,13 @@ int http_parse_headers(struct frontend_sk_node *sk)
                     .len = len - header_len - 1
                 };
 
-                char header_name_buf[200];
-                char header_value_buf[200];
-                DBG_PRINTF(DBG_WARNING, "header_name [%s], value [%s]\n",
-                        ngx_print(header_name_buf, 200, &header_name),
-                        ngx_print(header_value_buf, 200, &header_value));
+                if (g_main_debug >= DBG_NORMAL) {
+                    char header_name_buf[200];
+                    char header_value_buf[200];
+                    DBG_PRINTF(DBG_WARNING, "header_name [%s], value [%s]\n",
+                            ngx_print(header_name_buf, 200, &header_name),
+                            ngx_print(header_value_buf, 200, &header_value));
+                }
                 if (ngx_casecmp(&header_name, &g_ngx_str_host) == 0) {
                     p_parse_block->host = header_value;
                     p_parse_block->done_map |= bit_host;
@@ -331,6 +341,7 @@ int https_parse_hello(struct frontend_sk_node *sk)
 
 
     if (TLS_CONTENT_TYPE_HANDSHAKE != p_hdr->content_type) {
+        sk->err_type = CON_ERR_TYPE_INNER;
         return FAIL;
     }
 
@@ -351,6 +362,7 @@ int https_parse_hello(struct frontend_sk_node *sk)
     if (HANDSHAKE_TYPE_CLIENT_HELLO != p_handshake_hdr->type) {
         DBG_PRINTF(DBG_WARNING, "unknown handshake type [%u]\n",
                 p_handshake_hdr->type);
+        sk->err_type = CON_ERR_TYPE_INNER;
         return FAIL;
     }
 
@@ -364,6 +376,7 @@ int https_parse_hello(struct frontend_sk_node *sk)
     if (p_lv_pos > p_lv_end) {
         DBG_PRINTF(DBG_WARNING, "session_id_length [%u]\n",
                 session_id_length);
+        sk->err_type = CON_ERR_TYPE_INNER;
         return FAIL;
     }
 
@@ -373,6 +386,7 @@ int https_parse_hello(struct frontend_sk_node *sk)
     if (p_lv_pos > p_lv_end) {
         DBG_PRINTF(DBG_WARNING, "cipher_suites_length [%u]\n",
                 cipher_suites_length);
+        sk->err_type = CON_ERR_TYPE_INNER;
         return FAIL;
     }
 
@@ -382,6 +396,7 @@ int https_parse_hello(struct frontend_sk_node *sk)
     if (p_lv_pos > p_lv_end) {
         DBG_PRINTF(DBG_WARNING, "compression_methods_length [%u]\n",
                 compression_methods_length);
+        sk->err_type = CON_ERR_TYPE_INNER;
         return FAIL;
     }
 
@@ -394,6 +409,7 @@ int https_parse_hello(struct frontend_sk_node *sk)
     if (p_extensions_end > p_lv_end) {
         DBG_PRINTF(DBG_WARNING, "extensions_length [%u]\n",
                 extensions_length);
+        sk->err_type = CON_ERR_TYPE_INNER;
         return FAIL;
     }
 
@@ -404,8 +420,10 @@ int https_parse_hello(struct frontend_sk_node *sk)
         uint16_t length = ntohs(p_tlv->length);
 
         p_extensions_start += sizeof(struct tlv_hdr) + length;
-        if (p_extensions_start > p_extensions_end)
+        if (p_extensions_start > p_extensions_end) {
+            sk->err_type = CON_ERR_TYPE_INNER;
             return FAIL;
+        }
 
         switch(type) {
 
@@ -414,17 +432,20 @@ int https_parse_hello(struct frontend_sk_node *sk)
             uint16_t list_length = *p_list_length;
             list_length = ntohs(list_length);
             if (list_length <= sizeof(struct tlv_hdr)) {
+                sk->err_type = CON_ERR_TYPE_INNER;
                 return FAIL;
             }
 
             tlv_node_t *p_server_name_tlv = (tlv_node_t *)(p_tlv->value + 2);
 
             if (p_server_name_tlv->type != 0) {
+                sk->err_type = CON_ERR_TYPE_INNER;
                 return FAIL;
             }
 
             uint16_t server_name_length = ntohs(p_server_name_tlv->length);
             if (server_name_length > DOMAIN_MAX_LEN) {
+                sk->err_type = CON_ERR_TYPE_INNER;
                 return FAIL;
             }
 
@@ -442,6 +463,7 @@ int https_parse_hello(struct frontend_sk_node *sk)
 
     }
 
+    sk->err_type = CON_ERR_TYPE_INNER;
     return FAIL;
 }
 
@@ -495,25 +517,35 @@ int frontend_http_process(struct frontend_sk_node *sk)
             return ret;
         }
 
-        if (sk->parse_block.done_map | bit_done) {
-            char header_name_buf[200];
-            char header_value_buf[200];
-            DBG_PRINTF(DBG_WARNING, "header_name [%s], value [%s]\n",
-                    ngx_print(header_name_buf, 200, &sk->parse_block.host),
-                    ngx_print(header_value_buf, 200, &sk->parse_block.request_line));
-            if (chomp_space_ngx_str(&sk->parse_block.host) < 0)
+        if ((sk->parse_block.done_map & bit_done) == bit_done) {
+            if (g_main_debug >= DBG_NORMAL) {
+                char header_name_buf[200];
+                char header_value_buf[200];
+                DBG_PRINTF(DBG_WARNING, "header_name [%s], value [%s]\n",
+                        ngx_print(header_name_buf, 200, &sk->parse_block.host),
+                        ngx_print(header_value_buf, 200, &sk->parse_block.request_line));
+            }
+            if (chomp_space_ngx_str(&sk->parse_block.host) < 0) {
+                sk->err_type = CON_ERR_TYPE_INNER;
                 return FAIL;
+            }
 
             struct domain_node domain_node;
             ret = domain_map_query(&domain_node, &sk->parse_block.host);
-            if (ret == FAIL)
+            if (ret == FAIL) {
+                sk->err_type = CON_ERR_TYPE_CLIENT_OFFLINE;
                 return ret;
+            }
 
             sk->state = HTTP_STATE_RELAY;
 
             sk->user_id = domain_node.user_id;
             sk->backend_id = domain_node.backend_id;
             ret = frontend_http_relay_data(sk);
+        } else {
+            //parse done, but can not find host
+            if (ret == SUCCESS)
+                return FAIL;
         }
         break;
 
@@ -558,8 +590,9 @@ void frontend_socket_read_cb(void *v)
         int nread = recv(sk->fd, p_recv_node->buf + p_recv_node->end, to_recv, MSG_DONTWAIT);
         if (nread > 0) {
             p_recv_node->end += nread;
-            log_dump_hex(p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
             if (FAIL == frontend_http_process(sk)) {
+                if (sk->err_type == CON_ERR_TYPE_INNER)
+                    log_dump_hex(p_recv_node->buf + p_recv_node->pos, p_recv_node->end - p_recv_node->pos);
                 sk->exit_cb(sk);
                 return;
             }

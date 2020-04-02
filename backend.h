@@ -39,8 +39,10 @@ struct backend_sk_node {
     uint32_t            ip;
     uint16_t            port;
 
-    uint32_t            user_block_id;
-    uint32_t            front_listen_id;
+    uint32_t            user_id;
+    char                domain[DOMAIN_MAX_LEN + 1];
+    ngx_str_t           ngx_domain;
+
 
     void                *p_my_table;
 
@@ -53,10 +55,6 @@ struct backend_sk_node {
 
     uint8_t             type;
     uint8_t             blocked;
-
-    uint32_t            alive_cnt;
-    uint32_t            quality;
-    uint32_t            delay_ms;
 
     struct heap_timer   timer;
     uint32_t            salt;

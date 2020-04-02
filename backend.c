@@ -241,11 +241,19 @@ int backend_auth_process(struct backend_sk_node *sk)
     if (ret == SUCCESS) {
         //regist domain map
         domain_node.backend_id = sk->seq_id;
-        domain_map_insert( &domain_node);
+        if (SUCCESS == domain_map_insert( &domain_node)) {
+            sk->user_id = domain_node.user_id;
+
+            strncpy(sk->domain, domain_node.domain, DOMAIN_MAX_LEN);
+            sk->domain[DOMAIN_MAX_LEN] = 0;
+            sk->ngx_domain.data = (uint8_t *)sk->domain;
+            sk->ngx_domain.len = strlen(sk->domain);
+        }
+    } else {
     }
 
 EXIT:
-    //make regist success resp
+    //make regist resp
     sk->p_recv_node = NULL;
 
     p_recv_node->type = PIPE_NOTIFY_TYPE_SEND;
@@ -450,11 +458,10 @@ void backend_socket_write_cb(void *v)
 
             if (g_main_debug >= DBG_NORMAL) {
                 log_dump_hex(p_entry->buf + p_entry->pos, to_write);
-                DBG_PRINTF(DBG_CLOSE, "seq_id %u:%d nwrite: %d, front_listen_id %u\n",
+                DBG_PRINTF(DBG_CLOSE, "seq_id %u:%d nwrite: %d\n",
                         seq_id,
                         fd,
-                        nwrite,
-                        sk->front_listen_id);
+                        nwrite);
             }
         } while(nwrite > 0);
 
@@ -512,12 +519,16 @@ void backend_socket_exit_cb(void *v)
     struct backend_work_thread_table *p_table = sk->p_my_table;
 
     if (sk->status == SOCKET_STATUS_DEL) {
-        DBG_PRINTF(DBG_ERROR, "user %u seq_id %u:%d front_listen_id:%u critical error alread del\n",
-                sk->user_block_id,
+        DBG_PRINTF(DBG_ERROR, "seq_id %u:%d critical error alread del\n",
                 sk->seq_id,
-                sk->fd,
-                sk->front_listen_id);
+                sk->fd);
         return;
+    }
+
+    if (sk->user_id) {
+        domain_map_delete(&sk->ngx_domain, sk->seq_id);
+        sk->user_id = 0;
+        ngx_str_null(&sk->ngx_domain);
     }
 
     if (sk->timer.hole != BACKEND_HEAP_INVALID_HOLE) {
@@ -539,10 +550,9 @@ void backend_socket_exit_cb(void *v)
     if (g_main_debug >= DBG_WARNING) {
         char ip_str[30];
         uint32_t ip = htonl(sk->ip);
-        DBG_PRINTF(DBG_WARNING, "exit seq_id %u:%d front_listen_id:%u connect from %s:%d, ttl: %d\n",
+        DBG_PRINTF(DBG_WARNING, "exit seq_id %u:%d connect from %s:%d, ttl: %d\n",
                 sk->seq_id,
                 sk->fd,
-                sk->front_listen_id,
                 inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str)),
                 sk->port,
                 time(NULL) - sk->last_active);
@@ -601,8 +611,8 @@ void backend_event_connect(struct backend_work_thread_table *p_table, struct bac
     }
 
     p_node->p_my_table      = p_table;
-    p_node->user_block_id   = 0;
-    p_node->front_listen_id = 0;
+    p_node->user_id   = 0;
+    ngx_str_null(&p_node->ngx_domain);
     p_node->status          = SK_STATUS_NEW;
     p_node->type            = BACKEND_SOCKET_TYPE_READY;
     p_node->blocked         = 0;
@@ -775,10 +785,12 @@ void backend_old_process(struct backend_work_thread_table *p_table)
         pop_heap_timer(&p_table->heap);
         struct backend_sk_node *p_entry = list_entry(p_top_timer, struct backend_sk_node, timer);
         if (p_entry->last_active <= old_time) {
-            DBG_PRINTF(DBG_ERROR, "%u:%d, type:%d timeout:%u\n",
+            DBG_PRINTF(DBG_ERROR, "%u:%d, type:%d, now:%d, last_active:%d, timeout:%u\n",
                     p_entry->seq_id,
                     p_entry->fd,
                     p_entry->type,
+                    now,
+                    p_entry->last_active,
                     p_entry->timer.timeout);
             p_entry->exit_cb(p_entry);
         } else {
@@ -961,8 +973,6 @@ void backend_socket_handle_accpet_cb()
     p_node->port            = ntohs(client_addr.sin_port);
     p_node->p_recv_node     = NULL;
     p_node->last_active     = time(NULL);
-    p_node->alive_cnt       = 0;
-    p_node->quality         = 0;
     p_node->blocked         = 0;
 
     INIT_LIST_HEAD(&p_node->send_list);
