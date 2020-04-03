@@ -491,7 +491,7 @@ int frontend_http_process(struct frontend_sk_node *sk)
             return ret;
         }
 
-        if (sk->parse_block.done_map | bit_host) {
+        if ((sk->parse_block.done_map & bit_host) == bit_host) {
             char host_buf[200];
             DBG_PRINTF(DBG_WARNING, "host [%s]\n",
                     ngx_print(host_buf, 200, &sk->parse_block.host));
