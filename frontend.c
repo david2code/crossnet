@@ -75,10 +75,10 @@ void frontend_move_node_to_list(struct frontend_sk_node *sk, int type)
             type);
 
     struct frontend_work_thread_table *p_table = sk->p_my_table;
-    list_move(&sk->list_head, &p_table->list_head[type].list_head);
+    list_move(&sk->list_head, &p_table->list[type].list_head);
     if (sk->type != type) {
-        p_table->list_head[sk->type].num--;
-        p_table->list_head[type].num++;
+        p_table->list[sk->type].num--;
+        p_table->list[type].num++;
         sk->type = type;
     }
 }
@@ -779,7 +779,7 @@ void frontend_socket_del_cb(void *v)
                 sk->status);
     }
 
-    struct list_table *p_list_table = &p_table->list_head[sk->type];
+    struct list_table *p_list_table = &p_table->list[sk->type];
 
     list_del(&sk->list_head);
     p_list_table->num--;
@@ -827,7 +827,7 @@ void frontend_event_connect(struct frontend_work_thread_table *p_table, struct f
     p_node->exit_cb         = frontend_socket_exit_cb;
     p_node->del_cb          = frontend_socket_del_cb;
 
-    struct list_table *p_list_table = &p_table->list_head[FRONTEND_SOCKET_TYPE_READY];
+    struct list_table *p_list_table = &p_table->list[FRONTEND_SOCKET_TYPE_READY];
     list_add_fe(&p_node->list_head, &p_list_table->list_head);
     p_list_table->num++;
 
@@ -964,6 +964,21 @@ void frontend_thread_event_init(struct frontend_work_thread_table *p_table)
             p_table->event_fd);
 }
 
+void frontend_del_process(struct list_table *p_list_table)
+{
+    time_t now = time(NULL);
+    int count = 0;
+    struct list_head            *p_list = NULL;
+    struct list_head            *p_next = NULL;
+    list_for_each_safe(p_list, p_next, &p_list_table->list_head) {
+        struct frontend_sk_node *p_entry = list_entry(p_list, struct frontend_sk_node, list_head);
+        count++;
+        p_entry->del_cb((void *)p_entry);
+    }
+    if (count)
+        DBG_PRINTF(DBG_NORMAL, "del %d delay:%d\n", count, time(NULL) - now);
+}
+
 void *frontend_thread_socket_process(void *arg)
 {
     struct frontend_work_thread_table *p_table = (struct frontend_work_thread_table *)arg;
@@ -994,6 +1009,7 @@ void *frontend_thread_socket_process(void *arg)
             }
         }
 
+        frontend_del_process(&p_table->list[FRONTEND_SOCKET_TYPE_DEL]);
     }
 
     DBG_PRINTF(DBG_WARNING, "leave timestamp %d\n", time(NULL));
@@ -1016,8 +1032,8 @@ int frontend_thread_pool_init()
 
         int j;
         for (j = 0; j < FRONTEND_SOCKET_TYPE_MAX; j++) {
-            INIT_LIST_HEAD(&p_frontend_work_thread_table_array[i].list_head[j].list_head);
-            p_frontend_work_thread_table_array[i].list_head[j].num = 0;
+            INIT_LIST_HEAD(&p_frontend_work_thread_table_array[i].list[j].list_head);
+            p_frontend_work_thread_table_array[i].list[j].num = 0;
         }
 
         DHASH_INIT(p_frontend_work_thread_table_array, &p_frontend_work_thread_table_array[i].hash, FRONTEND_THREAD_HASH_SIZE);

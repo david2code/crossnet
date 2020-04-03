@@ -8,12 +8,12 @@
 
 #define FRONTEND_HTTP_PORT   80
 #define FRONTEND_HTTPS_PORT   443
-#define FRONTEND_WORK_THREAD_NUM    4
+#define FRONTEND_WORK_THREAD_NUM    2
 
+#define USER_PORT     45
 #define BACKEND_PORT   46
 #define BACKEND_WORK_THREAD_NUM    4
 
-#define USER_PORT     45
 
 #define TABLE_NAME_LEN     50
 #define USER_NAME_MAX_LEN  64

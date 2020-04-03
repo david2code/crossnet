@@ -134,7 +134,7 @@ struct frontend_work_thread_table {
     char                    table_name[TABLE_NAME_LEN + 1];
     pthread_mutex_t         mutex;
 
-    struct list_table       list_head[FRONTEND_SOCKET_TYPE_MAX];
+    struct list_table       list[FRONTEND_SOCKET_TYPE_MAX];
 
     struct hash_table       hash;
     struct notify_table     notify;
