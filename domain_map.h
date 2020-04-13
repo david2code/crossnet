@@ -16,7 +16,7 @@ struct domain_node {
 
     uint32_t                    user_id;
     uint32_t                    backend_id;
-
+    uint32_t                    ip;
 };
 
 struct domain_map_table {

@@ -106,6 +106,7 @@ enum msg_type {
     MSG_TYPE_AUTH,
     MSG_TYPE_AUTH_ACK,
     MSG_TYPE_SEND_DATA,
+    MSG_TYPE_FORCE_OFFLINE,
     MSG_TYPE_MAX,
 };
 
@@ -129,9 +130,14 @@ struct auth_ack_data {
     int  status;
 }__attribute__((packed));
 
+struct force_offline_data {
+    uint32_t  ip;
+}__attribute__((packed));
+
 int backend_init();
 void *backend_accept_process(void *arg);
 
 int backend_notify_send_data(struct notify_node *p_notify_node, uint32_t src_id, uint32_t dst_id);
+int backend_notify_force_offline(uint32_t id, uint32_t ip);
 
 #endif

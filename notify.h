@@ -18,6 +18,7 @@ enum pipe_notify_type {
     PIPE_NOTIFY_TYPE_CONNECT,
     PIPE_NOTIFY_TYPE_SEND,
     PIPE_NOTIFY_TYPE_FREE,
+    PIPE_NOTIFY_TYPE_FORCE_OFFLINE,
     PIPE_NOTIFY_TYPE_MAX
 };
 
@@ -30,8 +31,12 @@ struct notify_node {
     uint32_t                dst_id;
     uint16_t                pos;
     uint16_t                end;
-    uint8_t                 have_debug_id;
     uint8_t                 buf[MAX_BUFF_SIZE];    
+};
+
+struct notify_node_force_offline {
+    uint32_t                id;
+    uint32_t                ip;
 };
 
 void display_g_notify_buff_table();

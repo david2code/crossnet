@@ -565,7 +565,7 @@ void frontend_socket_read_cb(void *v)
 {
     struct frontend_sk_node *sk = (struct frontend_sk_node *)v;
 
-    if (sk->status > SOCKET_STATUS_UNUSE_AFTER_SEND)
+    if (sk->status > SOCKET_STATUS_EXIT_AFTER_SEND)
         return;
 
     sk->last_active = time(NULL);
@@ -636,7 +636,7 @@ void frontend_socket_write_cb(void *v)
     int fd = sk->fd;
     uint32_t seq_id = sk->seq_id;
 
-    if (sk->status > SOCKET_STATUS_UNUSE_AFTER_SEND) {
+    if (sk->status > SOCKET_STATUS_EXIT_AFTER_SEND) {
         DBG_PRINTF(DBG_WARNING, "seq_id %u:%d status %d!\n",
                 seq_id,
                 fd,
@@ -718,7 +718,7 @@ void frontend_socket_write_cb(void *v)
         }
     }
 
-    if (sk->status == SOCKET_STATUS_UNUSE_AFTER_SEND) {
+    if (sk->status == SOCKET_STATUS_EXIT_AFTER_SEND) {
         sk->exit_cb((void *)sk);
     } else {
         modify_event(p_table->epfd, fd, (void *)sk, EPOLLIN);// | EPOLLET);

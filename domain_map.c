@@ -29,6 +29,7 @@
 #include "buff.h"
 #include "domain_map.h"
 #include "user.h"
+#include "backend.h"
 
 extern int g_main_running;
 extern int g_main_debug;
@@ -108,6 +109,7 @@ int domain_map_insert(struct domain_node *p_domain_node)
     struct domain_node *p_entry = DHASH_FIND(g_domain_map_table, &p_table->hash, &p_domain_node->ngx_domain);
     if (p_entry) {
         //TODO force quit
+        backend_notify_force_offline(p_entry->backend_id, p_domain_node->ip);
 
         //domain conflict
         if (p_entry->user_id != p_domain_node->user_id) {

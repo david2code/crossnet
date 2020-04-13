@@ -317,7 +317,7 @@ void backend_socket_read_cb(void *v)
 {
     struct backend_sk_node *sk = (struct backend_sk_node *)v;
 
-    if (sk->status > SOCKET_STATUS_UNUSE_AFTER_SEND)
+    if (sk->status > SOCKET_STATUS_EXIT_AFTER_SEND)
         return;
 
     sk->last_active = time(NULL);
@@ -422,7 +422,7 @@ void backend_socket_write_cb(void *v)
     int fd = sk->fd;
     uint32_t seq_id = sk->seq_id;
 
-    if (sk->status > SOCKET_STATUS_UNUSE_AFTER_SEND) {
+    if (sk->status > SOCKET_STATUS_EXIT_AFTER_SEND) {
         DBG_PRINTF(DBG_WARNING, "seq_id %u:%d status %d!\n",
                 seq_id,
                 fd,
@@ -503,7 +503,7 @@ void backend_socket_write_cb(void *v)
         }
     }
 
-    if (sk->status == SOCKET_STATUS_UNUSE_AFTER_SEND) {
+    if (sk->status == SOCKET_STATUS_EXIT_AFTER_SEND) {
         sk->exit_cb((void *)sk);
     } else {
         modify_event(p_table->epfd, fd, (void *)sk, EPOLLIN);// | EPOLLET);
@@ -644,6 +644,44 @@ void backend_event_connect(struct backend_work_thread_table *p_table, struct bac
             p_node->fd);
 }
 
+int backend_notify_make_force_offline(struct backend_sk_node *sk, struct notify_node_force_offline *p_force)
+{
+    struct notify_node *p_notify_node = malloc_notify_node();
+    if (p_notify_node == NULL) {
+        return FAIL;
+    }
+
+    p_notify_node->type = PIPE_NOTIFY_TYPE_SEND;
+    p_notify_node->pos = 0;
+
+    uint16_t total_len = sizeof(struct backend_hdr) + sizeof(struct force_offline_data);
+    struct backend_hdr *p_hdr   = (struct backend_hdr *)p_notify_node->buf;
+    struct force_offline_data *p_data = (struct force_offline_data *)(p_hdr + 1);
+
+    p_hdr->magic        = htons(BACKEND_MAGIC);
+    p_hdr->type         = MSG_TYPE_FORCE_OFFLINE;
+    p_hdr->total_len    = htons(total_len);
+    p_notify_node->end  = total_len;
+
+    p_data->ip = htonl(p_force->ip);
+
+    sk->status = SOCKET_STATUS_EXIT_AFTER_SEND;
+    list_add_tail(&p_notify_node->list_head, &sk->send_list);
+    sk->write_cb(sk);
+    return 0;
+}
+
+void backend_event_force_offline(struct backend_work_thread_table *p_table, struct notify_node_force_offline *p_force)
+{
+    struct backend_sk_node *sk = DHASH_FIND(p_backend_work_thread_table_array, &p_table->hash, &p_force->id);
+    if (sk == NULL) {
+        DBG_PRINTF(DBG_NORMAL, "dst_id %u unfound!\n", p_force->id);
+        return;
+    }
+
+    backend_notify_make_force_offline(sk, p_force);
+}
+
 void backend_event_send(struct backend_work_thread_table *p_table, struct notify_node *p_notify_node)
 {
     struct backend_sk_node *sk = DHASH_FIND(p_backend_work_thread_table_array, &p_table->hash, &p_notify_node->dst_id);
@@ -687,11 +725,15 @@ void backend_event_read_cb(void *v)
                     break;
 
                 case PIPE_NOTIFY_TYPE_FREE:
-                    //manage_unuse_notify_free_socket_node(p_my_table, p_entry);
                     break;
 
                 case PIPE_NOTIFY_TYPE_CONNECT:
                     backend_event_connect(p_my_table, (struct backend_sk_node *)p_entry->p_node);
+                    free_notify_node(p_entry);
+                    break;
+
+                case PIPE_NOTIFY_TYPE_FORCE_OFFLINE:
+                    backend_event_force_offline(p_my_table, (struct notify_node_force_offline *)p_entry->buf);
                     free_notify_node(p_entry);
                     break;
 
@@ -906,6 +948,23 @@ int backend_notify_new_socket(struct backend_sk_node *p_node)
     p_notify_node->p_node = p_node;
 
     int index = p_node->seq_id % BACKEND_WORK_THREAD_NUM;
+    notify_table_put_head(&p_backend_work_thread_table_array[index].notify, p_notify_node);
+    backend_event_notify(p_backend_work_thread_table_array[index].event_fd);
+    return 0;
+}
+
+int backend_notify_force_offline(uint32_t id, uint32_t ip)
+{
+    struct notify_node *p_notify_node = malloc_notify_node();
+    if (p_notify_node == NULL) {
+        return -1;
+    }
+    p_notify_node->type = PIPE_NOTIFY_TYPE_CONNECT;
+    struct notify_node_force_offline *p_force = (struct notify_node_force_offline *)p_notify_node->buf;
+    p_force->id = id;
+    p_force->ip = ip;
+
+    int index = id % BACKEND_WORK_THREAD_NUM;
     notify_table_put_head(&p_backend_work_thread_table_array[index].notify, p_notify_node);
     backend_event_notify(p_backend_work_thread_table_array[index].event_fd);
     return 0;
