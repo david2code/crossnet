@@ -248,6 +248,8 @@ int backend_auth_process(struct backend_sk_node *sk)
             sk->domain[DOMAIN_MAX_LEN] = 0;
             sk->ngx_domain.data = (uint8_t *)sk->domain;
             sk->ngx_domain.len = strlen(sk->domain);
+
+            sk->status = SK_STATUS_AUTHED;
         }
     } else {
     }
@@ -317,7 +319,7 @@ void backend_socket_read_cb(void *v)
 {
     struct backend_sk_node *sk = (struct backend_sk_node *)v;
 
-    if (sk->status > SOCKET_STATUS_EXIT_AFTER_SEND)
+    if (sk->status > SK_STATUS_DEL_AFTER_SEND)
         return;
 
     sk->last_active = time(NULL);
@@ -422,7 +424,7 @@ void backend_socket_write_cb(void *v)
     int fd = sk->fd;
     uint32_t seq_id = sk->seq_id;
 
-    if (sk->status > SOCKET_STATUS_EXIT_AFTER_SEND) {
+    if (sk->status > SK_STATUS_DEL_AFTER_SEND) {
         DBG_PRINTF(DBG_WARNING, "seq_id %u:%d status %d!\n",
                 seq_id,
                 fd,
@@ -503,7 +505,12 @@ void backend_socket_write_cb(void *v)
         }
     }
 
-    if (sk->status == SOCKET_STATUS_EXIT_AFTER_SEND) {
+    DBG_PRINTF(DBG_ERROR, "seq_id %u:%d, status: %d\n",
+            seq_id,
+            fd,
+            sk->status);
+
+    if (sk->status == SK_STATUS_DEL_AFTER_SEND) {
         sk->exit_cb((void *)sk);
     } else {
         modify_event(p_table->epfd, fd, (void *)sk, EPOLLIN);// | EPOLLET);
@@ -518,7 +525,7 @@ void backend_socket_exit_cb(void *v)
     struct backend_sk_node *sk = (struct backend_sk_node *)v;
     struct backend_work_thread_table *p_table = sk->p_my_table;
 
-    if (sk->status == SOCKET_STATUS_DEL) {
+    if (sk->status == SK_STATUS_DEL) {
         DBG_PRINTF(DBG_ERROR, "seq_id %u:%d critical error alread del\n",
                 sk->seq_id,
                 sk->fd);
@@ -539,7 +546,7 @@ void backend_socket_exit_cb(void *v)
     delete_event(p_table->epfd, sk->fd, sk, EPOLLIN | EPOLLOUT);
 
     close(sk->fd);
-    sk->status = SOCKET_STATUS_DEL;
+    sk->status = SK_STATUS_DEL;
 
     if (sk->id_hash_node.prev != NULL) {
         list_del(&sk->id_hash_node);
@@ -665,7 +672,7 @@ int backend_notify_make_force_offline(struct backend_sk_node *sk, struct notify_
 
     p_data->ip = htonl(p_force->ip);
 
-    sk->status = SOCKET_STATUS_EXIT_AFTER_SEND;
+    sk->status = SK_STATUS_DEL_AFTER_SEND;
     list_add_tail(&p_notify_node->list_head, &sk->send_list);
     sk->write_cb(sk);
     return 0;
@@ -959,11 +966,12 @@ int backend_notify_force_offline(uint32_t id, uint32_t ip)
     if (p_notify_node == NULL) {
         return -1;
     }
-    p_notify_node->type = PIPE_NOTIFY_TYPE_CONNECT;
+    p_notify_node->type = PIPE_NOTIFY_TYPE_FORCE_OFFLINE;
     struct notify_node_force_offline *p_force = (struct notify_node_force_offline *)p_notify_node->buf;
     p_force->id = id;
     p_force->ip = ip;
 
+    DBG_PRINTF(DBG_ERROR, "isdfsdf");
     int index = id % BACKEND_WORK_THREAD_NUM;
     notify_table_put_head(&p_backend_work_thread_table_array[index].notify, p_notify_node);
     backend_event_notify(p_backend_work_thread_table_array[index].event_fd);

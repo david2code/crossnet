@@ -25,6 +25,7 @@ enum sk_status {
     SK_STATUS_NEW = 0,
     SK_STATUS_CHALLENGE,
     SK_STATUS_AUTHED,
+    SK_STATUS_DEL_AFTER_SEND,
     SK_STATUS_DEL,
     SK_STATUS_MAX,
 };
