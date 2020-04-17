@@ -241,6 +241,7 @@ int backend_auth_process(struct backend_sk_node *sk)
     if (ret == SUCCESS) {
         //regist domain map
         domain_node.backend_id = sk->seq_id;
+        domain_node.ip = sk->ip;
         if (SUCCESS == domain_map_insert( &domain_node)) {
             sk->user_id = domain_node.user_id;
 
@@ -504,11 +505,6 @@ void backend_socket_write_cb(void *v)
             return;
         }
     }
-
-    DBG_PRINTF(DBG_ERROR, "seq_id %u:%d, status: %d\n",
-            seq_id,
-            fd,
-            sk->status);
 
     if (sk->status == SK_STATUS_DEL_AFTER_SEND) {
         sk->exit_cb((void *)sk);
@@ -971,7 +967,6 @@ int backend_notify_force_offline(uint32_t id, uint32_t ip)
     p_force->id = id;
     p_force->ip = ip;
 
-    DBG_PRINTF(DBG_ERROR, "isdfsdf");
     int index = id % BACKEND_WORK_THREAD_NUM;
     notify_table_put_head(&p_backend_work_thread_table_array[index].notify, p_notify_node);
     backend_event_notify(p_backend_work_thread_table_array[index].event_fd);

@@ -131,8 +131,9 @@ int domain_map_insert(struct domain_node *p_domain_node)
     p_entry->ngx_domain.data = (uint8_t *)p_entry->domain;
     p_entry->ngx_domain.len = strlen(p_entry->domain);
 
-    p_entry->user_id = p_domain_node->user_id;
+    p_entry->user_id    = p_domain_node->user_id;
     p_entry->backend_id = p_domain_node->backend_id;
+    p_entry->ip         = p_domain_node->ip;
 
     if (-1 == DHASH_INSERT(g_domain_map_table, &p_table->hash, p_entry)) {
         DBG_PRINTF(DBG_ERROR, "add new domain node[%s], failed add hash failed\n", p_entry->domain);
