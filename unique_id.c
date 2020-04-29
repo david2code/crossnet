@@ -20,7 +20,7 @@ struct buff_table g_unique_buf_table;
 
 void unique_buf_table_init()
 {
-    buff_table_init(&g_unique_buf_table, UNIQUE_ID_REUSE_SIZE, sizeof(struct unique_id_node), "g_unique_buf_table");
+    buff_table_init(&g_unique_buf_table, SESSION_ID_REUSE_SIZE, sizeof(struct unique_id_node), "g_unique_buf_table");
 }
 
 inline struct unique_id_node *malloc_unique_node()
@@ -52,7 +52,7 @@ int unique_id_init()
     INIT_LIST_HEAD(&p_table->unuse);
     p_table->inuse_num = 0;
     pthread_mutex_init(&p_table->mutex, NULL);
-    p_table->id = UNIQUE_ID_SERVER_START;
+    p_table->id = SESSION_ID_SERVER_START;
 
     DBG_PRINTF(DBG_WARNING, "done\n");
 
@@ -63,13 +63,13 @@ uint32_t unique_id_get()
 {
     struct unique_id_table *p_table = &g_unique_id_table;
     struct unique_id_node *p_node = NULL;
-    uint32_t        id = UNIQUE_ID_SERVER_END;
+    uint32_t        id = SESSION_ID_SERVER_END;
 
     pthread_mutex_lock(&p_table->mutex);
 #if 1
-    if (p_table->id < UNIQUE_ID_REUSE_SIZE || list_empty(&p_table->unuse))
+    if (p_table->id < SESSION_ID_REUSE_SIZE || list_empty(&p_table->unuse))
     {
-        if (p_table->id < UNIQUE_ID_SERVER_END)
+        if (p_table->id < SESSION_ID_SERVER_END)
         {
             p_node       = malloc_unique_node();
             if (p_node != NULL)
@@ -90,7 +90,7 @@ uint32_t unique_id_get()
         id = p_node->id;
     }
 #else
-    if (p_table->id < UNIQUE_ID_SERVER_END)
+    if (p_table->id < SESSION_ID_SERVER_END)
     {
         p_node       = (struct unique_id_node *)malloc(sizeof(struct unique_id_node));
         if (p_node != NULL)

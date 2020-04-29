@@ -867,6 +867,9 @@ void *backend_thread_socket_process(void *arg)
                 sk->blocked = 0;
                 sk->write_cb((void *)sk);
             } else {
+                if(p_table->events[i].events & EPOLLERR) {
+                    sk->exit_cb(sk);
+                }
                 DBG_PRINTF(DBG_ERROR, "%u:%d, type:%d unknown event: %d\n",
                         sk->seq_id,
                         sk->fd,

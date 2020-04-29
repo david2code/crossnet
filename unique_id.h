@@ -1,17 +1,17 @@
-#ifndef __UNIQUE_ID_H
-#define __UNIQUE_ID_H
+#ifndef __SESSION_ID_H
+#define __SESSION_ID_H
 
 #include "limits.h"
 #include "kernel_list.h"
 
 enum{
-    UNIQUE_ID_ROUTER_START = 0,
-    UNIQUE_ID_ROUTER_END = 1000,
-    UNIQUE_ID_SERVER_START,
-    UNIQUE_ID_SERVER_END = UINT_MAX,
+    SESSION_ID_CLIENT_START = 0,
+    SESSION_ID_CLIENT_END = 1000,
+    SESSION_ID_SERVER_START,
+    SESSION_ID_SERVER_END = UINT_MAX,
 };
 
-#define UNIQUE_ID_REUSE_SIZE    (60000)
+#define SESSION_ID_REUSE_SIZE    (60000)
 
 struct unique_id_node {
     struct list_head    list_head;
