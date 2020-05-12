@@ -220,6 +220,97 @@ int domain_map_query(struct domain_node *p_domain_node, ngx_str_t *p_ngx_domain)
     return ret;
 }
 
+void domain_map_mark()
+{
+    struct domain_map_table *p_table = &g_domain_map_table;
+    struct list_head            *p_list = NULL;
+    struct list_table           *p_list_table = &p_table->list;
+
+    list_for_each(p_list, &p_list_table->list_head) {
+        struct domain_node *p_entry = list_entry(p_list, struct domain_node, list_head);
+
+        p_entry->del_flag = true;
+    }
+}
+
+/*
+ * mysql call it
+ */
+int domain_map_insert_or_update(struct domain_node *p_domain_node)
+{
+    struct domain_map_table *p_table = &g_domain_map_table;
+    int ret = SUCCESS;
+
+    struct domain_node *p_entry = DHASH_FIND(g_domain_map_table, &p_table->hash, &p_domain_node->ngx_domain);
+    if (p_entry) {
+        p_entry->user_id = p_domain_node->user_id;
+        p_entry->used_flow = p_domain_node->used_flow;
+        p_entry->del_flag = false;
+
+        goto EXIT;
+    }
+
+    p_entry = malloc_domain_node();
+    if (p_entry == NULL) {
+        ret = FAIL;
+        goto EXIT;
+    }
+
+    strncpy(p_entry->domain, p_domain_node->domain, DOMAIN_MAX_LEN);
+    p_entry->domain[DOMAIN_MAX_LEN] = 0;
+    p_entry->ngx_domain.data = (uint8_t *)p_entry->domain;
+    p_entry->ngx_domain.len = strlen(p_entry->domain);
+
+    p_entry->user_id    = p_domain_node->user_id;
+    p_entry->backend_id = p_domain_node->backend_id;
+    p_entry->ip         = p_domain_node->ip;
+    p_entry->used_flow  = p_domain_node->used_flow;
+    p_entry->del_flag   = false;
+
+    if (-1 == DHASH_INSERT(g_domain_map_table, &p_table->hash, p_entry)) {
+        DBG_PRINTF(DBG_ERROR, "add new domain node[%s], failed add hash failed\n", p_entry->domain);
+        free_domain_node(p_entry);
+        ret = FAIL;
+        goto EXIT;
+    }
+
+    list_add_fe(&p_entry->list_head, &p_table->list.list_head);
+    p_table->list.num++;
+
+EXIT:
+
+    DBG_PRINTF(DBG_WARNING, "domain %s user_id %u backend_id %u, insert success\n",
+            p_domain_node->domain,
+            p_domain_node->user_id,
+            p_domain_node->backend_id);
+    return ret;
+}
+
+void domain_map_del()
+{
+    struct domain_map_table *p_table = &g_domain_map_table;
+    struct list_head            *p_list = NULL;
+    struct list_head            *p_next = NULL;
+    struct list_table           *p_list_table = &p_table->list;
+
+    list_for_each_safe(p_list, p_next, &p_list_table->list_head) {
+        struct domain_node *p_entry = list_entry(p_list, struct domain_node, list_head);
+
+        if (p_entry->del_flag) {
+            list_del(&p_entry->hash_node);
+            list_del(&p_entry->list_head);
+            p_table->list.num--;
+
+            DBG_PRINTF(DBG_WARNING, "domain %s user_id %u backend_id %u, del success\n",
+                    p_entry->domain,
+                    p_entry->user_id,
+                    p_entry->backend_id);
+
+            free_domain_node(p_entry);
+        }
+    }
+}
+
 void display_g_domain_map_table()
 {
     struct domain_map_table *p_table = &g_domain_map_table;

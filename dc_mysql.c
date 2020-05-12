@@ -32,19 +32,23 @@ const char *g_mysql_init_db_sql = "CREATE DATABASE IF NOT EXISTS `%s` CHARACTER 
 
 const char *g_mysql_crossnet_table_name[MYSQL_CROSSNET_TABLE_NAME_MAX] = {
     "account",
+    "domain_list",
     "record"
 };
 
 const char *g_mysql_crossnet_select_column_str[MYSQL_CROSSNET_TABLE_NAME_MAX] = {
     "user_id,user_name,password,domain,start_time,end_time,total_flow,used_flow,del_flag,time",
+    "user_id,domain,used_flow,time",
 };
 
 const char *g_mysql_crossnet_init_table_sql[MYSQL_CROSSNET_TABLE_NAME_MAX] = {
     "CREATE TABLE IF NOT EXISTS `%s`.`%s` ("
         "  `user_id` int(10) unsigned NOT NULL AUTO_INCREMENT,"
+        "  `user_ip` int(20) unsigned NOT NULL DEFAULT '0',"
         "  `user_name` char(65) NOT NULL DEFAULT '',"
         "  `password` char(65) NOT NULL DEFAULT '',"
         "  `domain` varchar(200) NOT NULL DEFAULT '',"
+        "  `email` varchar(200) NOT NULL DEFAULT '',"
         "  `start_time` int(20) unsigned NOT NULL DEFAULT '0',"
         "  `end_time` int(20) unsigned NOT NULL DEFAULT '0',"
         "  `total_flow` bigint unsigned NOT NULL DEFAULT '0',"
@@ -52,8 +56,29 @@ const char *g_mysql_crossnet_init_table_sql[MYSQL_CROSSNET_TABLE_NAME_MAX] = {
         "  `del_flag` int(10) unsigned NOT NULL DEFAULT '0',"
         "  `time` int(20) unsigned NOT NULL DEFAULT '0',"
         "  PRIMARY KEY (`user_id`),"
-        "  UNIQUE KEY `user_name` (`user_name`)"
+        "  UNIQUE KEY `user_name` (`user_name`),"
+        "  UNIQUE KEY `email` (`email`)"
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+
+    "CREATE TABLE IF NOT EXISTS `%s`.`%s` ("
+        "  `user_id` int(10) unsigned NOT NULL DEFAULT '0',"
+        "  `domain` varchar(200) NOT NULL DEFAULT '',"
+        "  `used_flow` bigint unsigned NOT NULL DEFAULT '0',"
+        "  `time` int(20) unsigned NOT NULL DEFAULT '0',"
+        "  KEY (`user_id`),"
+        "  UNIQUE KEY `domain` (`domain`)"
+        ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+
+    "CREATE TABLE IF NOT EXISTS `%s`.`%s` ("
+        "  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,"
+        "  `user_id` int(10) unsigned NOT NULL DEFAULT '0',"
+        "  `recharge` int(10) unsigned NOT NULL DEFAULT '0',"
+        "  `used_flow` bigint unsigned NOT NULL DEFAULT '0',"
+        "  `time` int(20) unsigned NOT NULL DEFAULT '0',"
+        "  PRIMARY KEY (`id`),"
+        "  KEY (`user_id`)"
+        ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+
 };
 
 const char *g_mysql_crossnet_insert_head_format_str[MYSQL_STORE_TYPE_MAX] = {
@@ -254,6 +279,57 @@ int dc_mysql_update_account_table()
     return 0;
 }
 
+int dc_mysql_update_domain_list_table()
+{
+    char sql_buf[MYSQL_BUF_LEN];
+    int  ret = 0;
+    MYSQL_RES *res_ptr;
+    MYSQL_ROW sql_row;
+
+    snprintf(sql_buf, MYSQL_BUF_LEN, "SELECT %s FROM `%s`.`%s`", 
+            g_mysql_crossnet_select_column_str[MYSQL_CROSSNET_TABLE_NAME_DOMAIN_LIST],
+            g_mysql_db_name[MYSQL_DB_NAME_CROSSNET],
+            g_mysql_crossnet_table_name[MYSQL_CROSSNET_TABLE_NAME_DOMAIN_LIST]);
+
+    ret = dc_mysql_real_execute(sql_buf);    
+    if (0 != ret) {
+        DBG_PRINTF(DBG_ERROR, "error sql: %s\n", sql_buf);
+        return 0;
+    }
+    res_ptr = mysql_use_result(&g_mysql_con);
+
+    domain_map_wrlock();
+
+    domain_map_mark();
+    while((sql_row = mysql_fetch_row(res_ptr))) {
+        int i = 0;
+
+        struct domain_node domain_node;
+
+        domain_node.user_id             = atoi(sql_row[i++]);
+        strncpy(domain_node.domain,  sql_row[i++], DOMAIN_MAX_LEN);
+        domain_node.domain[DOMAIN_MAX_LEN] = 0;
+        domain_node.used_flow           = str_to_u64_base10(sql_row[i++]);
+        domain_node.backend_id = 0;
+        domain_node.ip = 0;
+
+        int ret = domain_map_insert_or_update(&domain_node);
+        if (ret != SUCCESS) {
+            DBG_PRINTF(DBG_WARNING, "update domain %s user_id %u backend_id %u, failed\n",
+                    domain_node.domain,
+                    domain_node.user_id,
+                    domain_node.backend_id);
+        }
+    }
+    domain_map_del();
+
+    domain_map_unlock();
+
+    mysql_free_result(res_ptr);
+
+    return 0;
+}
+
 void dc_mysql_enqueue_store_list(struct mysql_store_node *p_node)
 {
     struct mysql_manage_table *p_table = &g_mysql_table;
@@ -381,5 +457,6 @@ int dc_mysql_init()
     dc_mysql_table_init();
 
     dc_mysql_update_account_table();
+    dc_mysql_update_domain_list_table();
     return 0;
 }

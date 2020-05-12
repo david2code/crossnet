@@ -16,7 +16,12 @@ struct domain_node {
 
     uint32_t                    user_id;
     uint32_t                    backend_id;
+    uint64_t                    used_flow;
+
     uint32_t                    ip;
+    bool                        stop;/*stop when flow is used out*/
+
+    bool                        del_flag;
 };
 
 struct domain_map_table {
@@ -27,11 +32,19 @@ struct domain_map_table {
     struct hash_table       hash;
 };
 
+inline void domain_map_rdlock();
+inline void domain_map_wrlock();
+inline void domain_map_unlock();
+
 void domain_map_table_init();
 int domain_map_insert(struct domain_node *p_domain_node);
 int domain_map_delete(ngx_str_t *p_ngx_domain, uint32_t backend_id);
 int domain_map_query(struct domain_node *p_domain_node, ngx_str_t *p_ngx_domain);
 void display_g_domain_buff_table();
 void display_g_domain_map_table();
+
+void domain_map_mark();
+int domain_map_insert_or_update(struct domain_node *p_domain_node);
+void domain_map_del();
 
 #endif
