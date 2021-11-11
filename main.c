@@ -190,6 +190,48 @@ int parse_json_config(char *config_str)
                 ret = FAIL;
                 goto JSON_ERROR_END;
             }
+        } else if (strcmp(key, "http_port") == 0) {   
+            if(type == json_type_int) {
+                p_ctx->http_port = json_object_get_int(val);
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "https_port") == 0) {   
+            if(type == json_type_int) {
+                p_ctx->https_port = json_object_get_int(val);
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "user_port") == 0) {   
+            if(type == json_type_int) {
+                p_ctx->user_port = json_object_get_int(val);
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "backend_port") == 0) {   
+            if(type == json_type_int) {
+                p_ctx->backend_port = json_object_get_int(val);
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "frontend_work_thread") == 0) {   
+            if(type == json_type_int) {
+                p_ctx->frontend_work_thread = json_object_get_int(val);
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
+        } else if (strcmp(key, "backend_work_thread") == 0) {   
+            if(type == json_type_int) {
+                p_ctx->backend_work_thread = json_object_get_int(val);
+            } else {
+                ret = FAIL;
+                goto JSON_ERROR_END;
+            }
         } else if (strcmp(key, "debug_level") == 0) {   
             if(type == json_type_int) {
                 p_ctx->debug_level = json_object_get_int(val);
@@ -216,7 +258,34 @@ JSON_ERROR_END:
     return ret;
 }
 
-int check_and_print_ctx()
+void display_ctx()
+{
+    struct ctx *p_ctx = &g_ctx;
+
+    DBG_PRINTF(DBG_NORMAL, "display config start\n");
+
+    DBG_PRINTF(DBG_NORMAL, "mysql_name: %s\n", p_ctx->mysql_name);
+    DBG_PRINTF(DBG_NORMAL, "mysql_pass: %s\n", p_ctx->mysql_pass);
+    DBG_PRINTF(DBG_NORMAL, "mysql_port: %hu\n", p_ctx->mysql_port);
+
+    DBG_PRINTF(DBG_NORMAL, "http_port: %hu\n", p_ctx->http_port);
+    DBG_PRINTF(DBG_NORMAL, "https_port: %hu\n", p_ctx->https_port);
+
+    DBG_PRINTF(DBG_NORMAL, "user_port: %hu\n", p_ctx->user_port);
+    DBG_PRINTF(DBG_NORMAL, "backend_port: %hu\n", p_ctx->backend_port);
+
+    DBG_PRINTF(DBG_NORMAL, "frontend_work_thread: %hu\n", p_ctx->frontend_work_thread);
+    DBG_PRINTF(DBG_NORMAL, "backend_work_thread: %hu\n", p_ctx->backend_work_thread);
+
+
+    DBG_PRINTF(DBG_NORMAL, "debug_level: %d\n", p_ctx->debug_level);
+
+    DBG_PRINTF(DBG_NORMAL, "log_file: %s\n", p_ctx->log_file);
+
+    DBG_PRINTF(DBG_NORMAL, "display config end\n");
+}
+
+int check_ctx()
 {
     struct ctx *p_ctx = &g_ctx;
 
@@ -228,18 +297,41 @@ int check_and_print_ctx()
         printf("mysql_pass should not be empty!\n");
         return FAIL;
     }
+
     if (p_ctx->mysql_port < 1) {
-        printf("mysql_port should not be zero!\n");
+        printf("mysql_port should between 0 ~ 65535!\n");
         return FAIL;
     }
-    g_main_debug = p_ctx->debug_level;
 
-    printf("config success!\n");
-    printf("mysql_name: %s\n", p_ctx->mysql_name);
-    printf("mysql_pass: %s\n", p_ctx->mysql_pass);
-    printf("mysql_port: %hu\n", p_ctx->mysql_port);
-    printf("debug_level: %d\n", p_ctx->debug_level);
-    printf("log_file: %s\n", p_ctx->log_file);
+    if (p_ctx->http_port < 1) {
+        printf("_port should between 0 ~ 65535!\n");
+        return FAIL;
+    }
+
+    if (p_ctx->https_port < 1) {
+        printf("_port should between 0 ~ 65535!\n");
+        return FAIL;
+    }
+
+    if (p_ctx->user_port < 1) {
+        printf("user_port should between 0 ~ 65535!\n");
+        return FAIL;
+    }
+
+    if (p_ctx->backend_port < 1) {
+        printf("backend_port should between 0 ~ 65535!\n");
+        return FAIL;
+    }
+
+    if (p_ctx->frontend_work_thread < 1 || p_ctx->frontend_work_thread > 50) {
+        printf("frontend_work_thread should between 1 ~ 50!\n");
+        return FAIL;
+    }
+
+    if (p_ctx->backend_work_thread < 1 || p_ctx->backend_work_thread > 50) {
+        printf("backend_work_thread should between 1 ~ 50!\n");
+        return FAIL;
+    }
 
     return SUCCESS;
 }
@@ -320,9 +412,14 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    if (FAIL == check_and_print_ctx()) {
+    if (FAIL == check_ctx()) {
         exit(EXIT_FAILURE);
     }
+    DBG_PRINTF(DBG_NORMAL, "load config success!\n");
+    display_ctx();
+
+    g_main_debug = g_ctx.debug_level;
+
 
     log_init(g_ctx.log_file);
 

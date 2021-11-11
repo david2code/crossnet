@@ -28,6 +28,7 @@
 #include "domain_map.h"
 
 
+extern struct ctx g_ctx;
 struct accept_socket_table g_backend_accept_socket_table;
 
 #if 1
@@ -87,7 +88,7 @@ int backend_accept_init()
 
     p_table->epfd = epoll_create(BACKEND_ACCEPT_EPOLL_MAX_EVENTS);
 
-    uint16_t    listen_port = BACKEND_PORT;
+    uint16_t    listen_port = g_ctx.backend_port;
     int server_socket_fd = create_listen_socket(listen_port, BACKEND_ACCEPT_LISTEN_BACKLOG);
     if (server_socket_fd < 0) {
         DBG_PRINTF(DBG_ERROR, "create listen socket failed at %d, errnum: %d\n",
@@ -891,11 +892,11 @@ int backend_thread_pool_init()
 {
     int i, ret;
 
-    p_backend_work_thread_table_array = (struct backend_work_thread_table *)malloc(sizeof(struct backend_work_thread_table) * BACKEND_WORK_THREAD_NUM);
+    p_backend_work_thread_table_array = (struct backend_work_thread_table *)malloc(sizeof(struct backend_work_thread_table) * g_ctx.backend_work_thread);
     if (p_backend_work_thread_table_array == NULL)
         exit(EXIT_FAILURE);
 
-    for (i = 0; i < BACKEND_WORK_THREAD_NUM; i++) {
+    for (i = 0; i < g_ctx.backend_work_thread; i++) {
         p_backend_work_thread_table_array[i].index = i;
         pthread_mutex_init(&p_backend_work_thread_table_array[i].mutex, NULL);
         sprintf(p_backend_work_thread_table_array[i].table_name, "backend_%d", i);
@@ -953,7 +954,7 @@ int backend_notify_new_socket(struct backend_sk_node *p_node)
     p_notify_node->type = PIPE_NOTIFY_TYPE_CONNECT;
     p_notify_node->p_node = p_node;
 
-    int index = p_node->seq_id % BACKEND_WORK_THREAD_NUM;
+    int index = p_node->seq_id % g_ctx.backend_work_thread;
     notify_table_put_head(&p_backend_work_thread_table_array[index].notify, p_notify_node);
     backend_event_notify(p_backend_work_thread_table_array[index].event_fd);
     return 0;
@@ -970,7 +971,7 @@ int backend_notify_force_offline(uint32_t id, uint32_t ip)
     p_force->id = id;
     p_force->ip = ip;
 
-    int index = id % BACKEND_WORK_THREAD_NUM;
+    int index = id % g_ctx.backend_work_thread;
     notify_table_put_head(&p_backend_work_thread_table_array[index].notify, p_notify_node);
     backend_event_notify(p_backend_work_thread_table_array[index].event_fd);
     return 0;
@@ -997,7 +998,7 @@ int backend_notify_send_data(struct notify_node *p_notify_node, uint32_t src_id,
     struct backend_data *p_data = (struct backend_data *)(p_hdr + 1);
     p_data->session_id = htonl(src_id);
 
-    int index = p_notify_node->dst_id % BACKEND_WORK_THREAD_NUM;
+    int index = p_notify_node->dst_id % g_ctx.backend_work_thread;
     notify_table_put_tail(&p_backend_work_thread_table_array[index].notify, p_notify_node);
     backend_event_notify(p_backend_work_thread_table_array[index].event_fd);
     return 0;

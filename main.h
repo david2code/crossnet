@@ -6,15 +6,6 @@
 
 #define USER_NUM      100
 
-#define FRONTEND_HTTP_PORT   80
-#define FRONTEND_HTTPS_PORT   443
-#define FRONTEND_WORK_THREAD_NUM    2
-
-#define USER_PORT     45
-#define BACKEND_PORT   46
-#define BACKEND_WORK_THREAD_NUM    4
-
-
 #define TABLE_NAME_LEN     50
 #define USER_NAME_MAX_LEN  64
 #define PASSWORD_MAX_LEN   64
@@ -45,6 +36,16 @@ struct ctx {
     char        mysql_name[USER_NAME_MAX_LEN + 1];
     char        mysql_pass[PASSWORD_MAX_LEN + 1];
     uint16_t    mysql_port;
+
+    uint16_t    http_port;
+    uint16_t    https_port;
+
+
+    uint16_t    user_port;
+    uint16_t    backend_port;
+
+    uint16_t    frontend_work_thread;
+    uint16_t    backend_work_thread;
 
     int         debug_level;
 

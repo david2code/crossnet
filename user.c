@@ -34,6 +34,7 @@
 
 extern int g_main_running;
 extern int g_main_debug;
+extern struct ctx g_ctx;
 
 const ngx_str_t g_const_control_pattern_json = ngx_string("json");
 
@@ -1712,7 +1713,7 @@ void user_event_init(struct user_socket_table *p_table)
     DBG_PRINTF(DBG_WARNING, "user %d\n", p_table->epfd);
 
     uint32_t listen_ip = 0;
-    uint16_t listen_port = USER_PORT;
+    uint16_t listen_port = g_ctx.user_port;
     char ip_str[30];
     uint32_t ip = htonl(listen_ip);
     /* 监听在某端口上，处理用户认证数据 */

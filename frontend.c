@@ -28,6 +28,8 @@
 #include "domain_map.h"
 
 
+extern struct ctx g_ctx;
+
 struct frontend_accept_socket_table g_frontend_accept_socket_table;
 
 const ngx_str_t g_ngx_str_host = ngx_string("Host");
@@ -153,9 +155,9 @@ int frontend_accept_init()
 
     p_table->epfd = epoll_create(FRONTEND_ACCEPT_EPOLL_MAX_EVENTS);
 
-    if (FAIL == frontend_listen_port_init(FRONTEND_HTTP_PORT))
+    if (FAIL == frontend_listen_port_init(g_ctx.http_port))
         exit(EXIT_FAILURE);
-    if (FAIL == frontend_listen_port_init(FRONTEND_HTTPS_PORT))
+    if (FAIL == frontend_listen_port_init(g_ctx.https_port))
         exit(EXIT_FAILURE);
 
     return 0;
@@ -165,7 +167,7 @@ struct frontend_work_thread_table *p_frontend_work_thread_table_array = NULL;
 
 inline uint32_t frontend_hash(uint32_t *key)
 {
-    return (*key) / (FRONTEND_WORK_THREAD_NUM);
+    return (*key) / (g_ctx.frontend_work_thread);
 }
 
 DHASH_GENERATE(p_frontend_work_thread_table_array, frontend_sk_node, id_hash_node, seq_id, uint32_t, frontend_hash, uint32_t_cmp);
@@ -477,7 +479,7 @@ int frontend_http_process(struct frontend_sk_node *sk)
 
     if (sk->state == HTTP_STATE_INIT) {
         http_parse_block_init(sk);
-        if (sk->my_port == FRONTEND_HTTP_PORT)
+        if (sk->my_port == g_ctx.http_port)
             sk->state = HTTP_STATE_REQUEST;
         else 
             sk->state = HTTP_STATE_HELLO;
@@ -1021,11 +1023,11 @@ int frontend_thread_pool_init()
 {
     int i, res;
 
-    p_frontend_work_thread_table_array = (struct frontend_work_thread_table *)malloc(sizeof(struct frontend_work_thread_table) * FRONTEND_WORK_THREAD_NUM);
+    p_frontend_work_thread_table_array = (struct frontend_work_thread_table *)malloc(sizeof(struct frontend_work_thread_table) * g_ctx.frontend_work_thread);
     if (p_frontend_work_thread_table_array == NULL)
         exit(EXIT_FAILURE);
 
-    for (i = 0; i < FRONTEND_WORK_THREAD_NUM; i++) {
+    for (i = 0; i < g_ctx.frontend_work_thread; i++) {
         p_frontend_work_thread_table_array[i].index = i;
         pthread_mutex_init(&p_frontend_work_thread_table_array[i].mutex, NULL);
         sprintf(p_frontend_work_thread_table_array[i].table_name, "frontend_%d", i);
@@ -1078,7 +1080,7 @@ int frontend_notify_new_socket(struct frontend_sk_node *p_node)
     p_notify_node->type = PIPE_NOTIFY_TYPE_CONNECT;
     p_notify_node->p_node = p_node;
 
-    int index = p_node->seq_id % FRONTEND_WORK_THREAD_NUM;
+    int index = p_node->seq_id % g_ctx.frontend_work_thread;
     notify_table_put_head(&p_frontend_work_thread_table_array[index].notify, p_notify_node);
     frontend_event_notify(p_frontend_work_thread_table_array[index].event_fd);
     return 0;
@@ -1090,7 +1092,7 @@ int frontend_notify_send_data(struct notify_node *p_notify_node, uint32_t src_id
     p_notify_node->src_id = src_id;
     p_notify_node->dst_id = dst_id;
 
-    int index = p_notify_node->dst_id % FRONTEND_WORK_THREAD_NUM;
+    int index = p_notify_node->dst_id % g_ctx.frontend_work_thread;
     notify_table_put_tail(&p_frontend_work_thread_table_array[index].notify, p_notify_node);
     frontend_event_notify(p_frontend_work_thread_table_array[index].event_fd);
     return 0;

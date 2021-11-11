@@ -4,6 +4,16 @@
     "mysql_pass": "xx_78NumberRT",
     "mysql_port": 3306,
     "debug_level": 3,
+    "debug_level": 3,
+
+    "http_port": 8080,
+    "https_port": 443,
+
+    "user_port": 45,
+    "backend_port": 46,
+
+    "frontend_work_thread": 2,
+    "backend_work_thread": 2,
 
     "log_file": "/var/log/crossnet.log"
 }
