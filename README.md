@@ -1,6 +1,8 @@
 # crossnet
 打通到内网的通路，实现在外部访问内网web服务器、远程连接内网windows、linux等功能。
 
+# pre-request
+## centos
 devel:
 	yum install -y make
 	yum install -y openssl-devel
@@ -9,8 +11,12 @@ devel:
 	tar -zxvf libiconv-1.15.tar.gz && ./configure && make && make install 
 	ldconfig
 
-transfer ip address to location
-usage:
+## ubuntu
+    sudo apt update
+    sudo apt install libjson-c-dev
+    sudo apt install libmysqlclient-dev
+
+# usage
 
     display
         curl "http://127.0.0.1:45/debug?display_g_user_table"

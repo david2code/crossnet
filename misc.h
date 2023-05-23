@@ -59,64 +59,64 @@ typedef struct{
 #if (NGX_HAVE_LITTLE_ENDIAN && NGX_HAVE_NONALIGNED)
 
 #define ngx_str3_cmp(m, c0, c1, c2, c3)                                       \
-    *(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
+    (*(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0))
 
 #define ngx_str3Ocmp(m, c0, c1, c2, c3)                                       \
-    *(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
+    (*(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0))
 
 #define ngx_str4cmp(m, c0, c1, c2, c3)                                        \
-    *(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)
+    (*(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0))
 
 #define ngx_str5cmp(m, c0, c1, c2, c3, c4)                                    \
-    *(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)             \
+    (*(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0) )            \
         && m[4] == c4
 
 #define ngx_str6cmp(m, c0, c1, c2, c3, c4, c5)                                \
-    *(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)             \
-        && (((uint32_t *) m)[1] & 0xffff) == ((c5 << 8) | c4)
+    (*(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)             \
+        && (((uint32_t *) m)[1] & 0xffff) == ((c5 << 8) | c4))
 
 #define ngx_str7_cmp(m, c0, c1, c2, c3, c4, c5, c6, c7)                       \
-    *(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)             \
-        && ((uint32_t *) m)[1] == ((c7 << 24) | (c6 << 16) | (c5 << 8) | c4)
+    (*(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)             \
+        && ((uint32_t *) m)[1] == ((c7 << 24) | (c6 << 16) | (c5 << 8) | c4))
 
 #define ngx_str8cmp(m, c0, c1, c2, c3, c4, c5, c6, c7)                        \
-    *(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)             \
-        && ((uint32_t *) m)[1] == ((c7 << 24) | (c6 << 16) | (c5 << 8) | c4)
+    (*(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)             \
+        && ((uint32_t *) m)[1] == ((c7 << 24) | (c6 << 16) | (c5 << 8) | c4))
 
 #define ngx_str9cmp(m, c0, c1, c2, c3, c4, c5, c6, c7, c8)                    \
-    *(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)             \
+    (*(uint32_t *) m == ((c3 << 24) | (c2 << 16) | (c1 << 8) | c0)             \
         && ((uint32_t *) m)[1] == ((c7 << 24) | (c6 << 16) | (c5 << 8) | c4)  \
-        && m[8] == c8
+        && m[8] == c8)
 
 #else /* !(NGX_HAVE_LITTLE_ENDIAN && NGX_HAVE_NONALIGNED) */
 
 #define ngx_str3_cmp(m, c0, c1, c2, c3)                                       \
-    m[0] == c0 && m[1] == c1 && m[2] == c2
+    (m[0] == c0 && m[1] == c1 && m[2] == c2)
 
 #define ngx_str3Ocmp(m, c0, c1, c2, c3)                                       \
-    m[0] == c0 && m[2] == c2 && m[3] == c3
+    (m[0] == c0 && m[2] == c2 && m[3] == c3)
 
 #define ngx_str4cmp(m, c0, c1, c2, c3)                                        \
-    m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3
+    (m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3)
 
 #define ngx_str5cmp(m, c0, c1, c2, c3, c4)                                    \
-    m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3 && m[4] == c4
+    (m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3 && m[4] == c4)
 
 #define ngx_str6cmp(m, c0, c1, c2, c3, c4, c5)                                \
-    m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3                      \
-        && m[4] == c4 && m[5] == c5
+    (m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3                      \
+        && m[4] == c4 && m[5] == c5)
 
 #define ngx_str7_cmp(m, c0, c1, c2, c3, c4, c5, c6, c7)                       \
-    m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3                      \
-        && m[4] == c4 && m[5] == c5 && m[6] == c6
+    (m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3                      \
+        && m[4] == c4 && m[5] == c5 && m[6] == c6)
 
 #define ngx_str8cmp(m, c0, c1, c2, c3, c4, c5, c6, c7)                        \
-    m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3                      \
-        && m[4] == c4 && m[5] == c5 && m[6] == c6 && m[7] == c7
+    (m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3                      \
+        && m[4] == c4 && m[5] == c5 && m[6] == c6 && m[7] == c7)
 
 #define ngx_str9cmp(m, c0, c1, c2, c3, c4, c5, c6, c7, c8)                    \
-    m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3                      \
-        && m[4] == c4 && m[5] == c5 && m[6] == c6 && m[7] == c7 && m[8] == c8
+    (m[0] == c0 && m[1] == c1 && m[2] == c2 && m[3] == c3                      \
+        && m[4] == c4 && m[5] == c5 && m[6] == c6 && m[7] == c7 && m[8] == c8)
 
 #endif
 
@@ -194,12 +194,12 @@ uint32_t get_eth_ip(const char *eth_name);
 uint32_t get_addrinfo(char *host);
 unsigned long long ntohll(unsigned long long val);
 unsigned long long htonll(unsigned long long val);
-inline int uint16_t_cmp(uint16_t *a, uint16_t *b);
-inline int uint32_t_cmp(uint32_t *a, uint32_t *b);
-inline int uint64_t_cmp(uint64_t *a, uint64_t *b);
-inline int ngx_cmp(const ngx_str_t *a, const ngx_str_t *b);
-inline int ngx_casecmp(const ngx_str_t *a, const ngx_str_t *b);
-inline uint32_t ngx_hash(ngx_str_t *key);
+extern int uint16_t_cmp(uint16_t *a, uint16_t *b);
+extern int uint32_t_cmp(uint32_t *a, uint32_t *b);
+extern int uint64_t_cmp(uint64_t *a, uint64_t *b);
+extern int ngx_cmp(const ngx_str_t *a, const ngx_str_t *b);
+extern int ngx_casecmp(const ngx_str_t *a, const ngx_str_t *b);
+extern uint32_t ngx_hash(ngx_str_t *key);
 
 char *ngx_print(char *buf, int len, ngx_str_t *p_ngx_str);
 int ngx_split(ngx_str_t *orig, char sepch, ngx_str_t *part_a, ngx_str_t *part_b);
@@ -211,7 +211,7 @@ ssize_t chomp_ngx_str (ngx_str_t *ngx_str);
 ssize_t chomp_space_ngx_str(ngx_str_t *ngx_str);
 int base64_encode( const unsigned char * bindata, unsigned char *base64, int binlength, int out_len);
 int base64_decode(const char *base64, unsigned char *bindata);
-inline uint32_t  get_network_from_ip(uint32_t ip);
+extern uint32_t  get_network_from_ip(uint32_t ip);
 int create_udp_listen_socket(uint16_t *port);
 int code_convert( const char* from_charset,
                   const char* to_charset,

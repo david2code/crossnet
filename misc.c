@@ -37,13 +37,9 @@ uint32_t get_ip_by_hostname(const char *hostname)
     struct hostent* hostent = gethostbyname(hostname);
 
     if (hostent == NULL)
-    {
         return 0;
-    }
     else
-    {
         return ntohl(*(uint32_t *)hostent->h_addr);
-    }
 }
 
 #if 1  
@@ -215,15 +211,11 @@ int set_none_block(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags < 0)
-    {
         return -1;
-    }
     
     int r = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     if (r < 0)
-    {
         return -1;
-    }
 
     return 0;
 }

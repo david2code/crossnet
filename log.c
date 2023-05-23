@@ -77,75 +77,50 @@ void log_dump_hex(const uint8_t *data, int32_t len)
 
     for (line = 0; line < max_lines; line++) {
 	    char buf[100] = {0};
+        int buf_len = 0;
 
-        sprintf( buf, "%s%08x  ", buf, line * 16 );
+        buf_len = sprintf( buf, "%08x  ", line * 16 );
 
         /* 打印 hex 字符 */
         int i;
-        for ( i = line * 16; i < ( 8 + ( line * 16 ) ); i++ )
-        {
+        for ( i = line * 16; i < ( 8 + ( line * 16 ) ); i++ ) {
             if ( i < len )
-            {
-                sprintf( buf, "%s%02x ", buf, data[i] );
-            }
+                buf_len += sprintf( buf + buf_len, "%02x ", data[i] );
             else
-            {
-                sprintf( buf, "%s   ", buf);
-            }
+                buf_len += sprintf( buf + buf_len, "   ");
         }
 
-        sprintf( buf, "%s ", buf);
-        for ( i = ( line * 16 ) + 8; i < ( 16 + ( line * 16 ) ); i++ )
-        {
+        buf_len += sprintf( buf + buf_len, " ");
+        for ( i = ( line * 16 ) + 8; i < ( 16 + ( line * 16 ) ); i++ ) {
             if ( i < len )
-            {
-                sprintf( buf, "%s%02x ", buf, data[i] );
-            }
+                buf_len += sprintf( buf + buf_len, "%02x ", data[i] );
             else
-            {
-                sprintf( buf, "%s   " ,buf);
-            }
+                buf_len += sprintf( buf + buf_len, "   ");
         }
 
-        sprintf( buf, "%s " ,buf);
+        buf_len += sprintf( buf + buf_len, " ");
 
         /* 打印ascii字符 */
-        for ( i = line * 16; i < ( 8 + ( line * 16 ) ); i++ )
-        {
-            if ( i < len )
-            {
+        for ( i = line * 16; i < ( 8 + ( line * 16 ) ); i++ ) {
+            if ( i < len ) {
                 if ( 32 <= data[i] && data[i] <= 126 )
-                {
-                    sprintf( buf, "%s%c", buf, data[i] );
-                }
+                    buf_len += sprintf( buf + buf_len, "%c", data[i] );
                 else
-                {
-                    sprintf( buf, "%s." ,buf);
-                }
-            }
-            else
-            {
-                sprintf( buf, "%s ", buf);
+                    buf_len += sprintf( buf + buf_len, ".");
+            } else {
+                buf_len += sprintf( buf + buf_len, " ");
             }
         }
 
-        sprintf( buf, "%s ", buf);
-        for ( i = ( line * 16 ) + 8; i < ( 16 + ( line * 16 ) ); i++ )
-        {
-            if ( i < len )
-            {
+        buf_len += sprintf( buf + buf_len, " ");
+        for ( i = ( line * 16 ) + 8; i < ( 16 + ( line * 16 ) ); i++ ) {
+            if ( i < len ) {
                 if ( 32 <= data[i] && data[i] <= 126 )
-                {
-                    sprintf( buf, "%s%c", buf, data[i] );
-                }
+                    buf_len += sprintf( buf + buf_len, "%c", data[i] );
                 else
-                {
-                    sprintf( buf, "%s.", buf);
-                }
-            }
-            else
-            {
-                sprintf( buf, "%s ", buf);
+                    buf_len += sprintf( buf + buf_len, ".");
+            } else {
+                buf_len += sprintf( buf + buf_len, " ");
             }
         }
 
@@ -186,10 +161,11 @@ void io_printf(const char *dbg_str, const char *func, int line, const char* fmt,
     tunnelBuf[len] = 0;
 
     fd = fopen( log_path, "at+" );
-    if (!fd)
+    if (!fd) {
         return;
+    }
 
-	if(!g_file_size) {
+	if (!g_file_size) {
         struct stat file_stat;
         stat(log_path, &file_stat);
         g_file_size += file_stat.st_size;

@@ -31,7 +31,8 @@ struct hash_table {
 int                                         \
 name##_HASH_INIT(struct hash_table *p_table, uint32_t hash_size)                          \
 {                                           \
-    strncpy(p_table->table_name, #name, 30); \
+    strncpy(p_table->table_name, #name, TABLE_NAME_LEN); \
+    p_table->table_name[TABLE_NAME_LEN] = 0; \
     p_table->size = hash_size;                       \
     p_table->node_size = sizeof(struct type);   \
     p_table->count = 0;                         \

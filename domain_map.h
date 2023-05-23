@@ -32,9 +32,9 @@ struct domain_map_table {
     struct hash_table       hash;
 };
 
-inline void domain_map_rdlock();
-inline void domain_map_wrlock();
-inline void domain_map_unlock();
+extern void domain_map_rdlock();
+extern void domain_map_wrlock();
+extern void domain_map_unlock();
 
 void domain_map_table_init();
 int domain_map_insert(struct domain_node *p_domain_node);

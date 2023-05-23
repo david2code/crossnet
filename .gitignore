@@ -2,3 +2,5 @@ tags
 cscope.*out
 *.swp
 .exrc
+*.o
+crossnet_server

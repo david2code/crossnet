@@ -957,6 +957,7 @@ void user_add_account(struct user_sk_node *sk, struct user_interface_parse_block
         struct user_account_block *p_resp = &p_user_interface_parse_block->resp.account;
 
         strncpy(p_resp->user_name, p_req->user_name, USER_NAME_MAX_LEN);
+        p_resp->user_name[USER_NAME_MAX_LEN] = 0;
         p_resp->end_time = p_req->end_time;
         p_resp->total_flow = p_req->total_flow;
 
@@ -989,6 +990,7 @@ void user_mdf_account(struct user_sk_node *sk, struct user_interface_parse_block
         struct user_account_block *p_resp = &p_user_interface_parse_block->resp.account;
 
         strncpy(p_resp->user_name, p_req->user_name, USER_NAME_MAX_LEN);
+        p_resp->user_name[USER_NAME_MAX_LEN] = 0;
         p_resp->end_time = p_req->end_time;
         p_resp->total_flow = p_req->total_flow;
 
@@ -1016,6 +1018,7 @@ void user_del_account(struct user_sk_node *sk, struct user_interface_parse_block
         struct user_account_block *p_resp = &p_user_interface_parse_block->resp.account;
 
         strncpy(p_resp->user_name, p_req->user_name, USER_NAME_MAX_LEN);
+        p_resp->user_name[USER_NAME_MAX_LEN] = 0;
 
         p_user_interface_parse_block->code = USER_CODE_TYPE_SUCCESS;
     }
@@ -1054,6 +1057,7 @@ void user_query_account(struct user_sk_node *sk, struct user_interface_parse_blo
     struct user_account_block *p_resp = &p_user_interface_parse_block->resp.account;
 
     strncpy(p_resp->user_name, p_user_block->user_name, USER_NAME_MAX_LEN);
+    p_resp->user_name[USER_NAME_MAX_LEN] = 0;
     p_resp->end_time = p_user_block->end_time;
     p_resp->total_flow = p_user_block->total_flow;
     p_resp->used_flow = p_user_block->used_flow;

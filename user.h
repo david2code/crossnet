@@ -185,8 +185,8 @@ struct user_table {
 
 void user_socket_init();
 void user_table_init();
-inline void user_table_lock();
-inline void user_table_unlock();
+extern void user_table_lock();
+extern void user_table_unlock();
 
 int user_add_account_to_table(
         enum user_code_type *code,
